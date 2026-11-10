@@ -1,0 +1,33 @@
+# Pronunciaciones personalizadas para generar_voces.py
+# Formato:  texto=como debe leerse   (palabra completa, distingue mayusculas)
+# Se aplican ANTES de las reglas automaticas (numeros y siglas deletreadas).
+# Edita y vuelve a lanzar con --solo-texto para comprobar como queda.
+
+AWACS=auacs
+SAM=sam
+SAMs=sams
+NATO=nato
+JSTARS=yeistars
+TACAN=tacan
+ILS=i ele ese
+RTB=erre te be
+IFF=i efe efe
+ETA=e te a
+GCI=ge ce i
+HARM=jarm
+AMRAAM=amram
+MiG=mig
+Mig=mig
+JDAM=yeidam
+Maverick=máverick
+Mavericks=mávericks
+bullseye=bulsái
+Bullseye=bulsái
+bingo=bingo
+winchester=uínchester
+Winchester=uínchester
+tally=tali
+Tally=tali
+fox=fox
+Fox=fox
+QNH=cu ene hache

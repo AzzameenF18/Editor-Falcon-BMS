@@ -1,0 +1,39 @@
+VOCES DE RADIO EN ESPANOL - Falcon BMS 4.38 (Corea, Balcanes, Grecia, Israel)
+
+Esta carpeta (Voces) va junto a Editor_BMS.ps1: la pestana "Voces" del editor lo hace todo
+(escuchar original/espanol, corregir textos, generar, montar el Falcon.tlk y guardarlo en el
+instalador). En la pestana, el boton de la rueda dentada indica Python y ffmpeg si no los encuentra.
+
+Preparacion (una sola vez): pestana Voces -> "Preparar entorno..." (o clic derecho en
+Preparar_voces.ps1 -> Ejecutar con PowerShell). Instala en esta carpeta:
+  Python 3.11 (si falta), venv\ (PyTorch con CUDA, coqui-tts, scipy), ffmpeg\ y el modelo XTTS-v2.
+  Necesita internet y unos 6 GB. Pide aceptar la licencia CPML de XTTS (uso no comercial).
+Para distribuir el editor NO incluyas venv\, ffmpeg\, cache\, wav_es\, prueba\ ni los *.latentes.pt.
+
+Cada (voz, texto) se genera UNA vez (carpeta cache) y se reutiliza en los 4 teatros.
+Cada voz se "estandariza" una vez con ref\vozNN.wav (~30 s de sus frases mas largas) y se
+guarda en ref\vozNN.latentes.pt.
+
+Tambien se puede usar desde la consola:
+  python generar_voces.py --solo-texto > textos.txt     (como se leen numeros y siglas)
+  python generar_voces.py --prueba 30                   (30 al azar en .\prueba)
+  python generar_voces.py --teatro Corea                (o Balcanes, Grecia, Israel; por defecto todos)
+  python generar_voces.py --ids 14,26 --forzar          (rehacer clips concretos)
+  python generar_voces.py --procesos 3                  (3 procesos de XTTS a la vez en la GPU)
+     --igual todo / nada   indicativos y nombres con voz clonada / numeros en ingles
+     --temperatura 0.65 --velocidad 1.0 --rms 6000 --radio 0/1/2 (efecto: limpio/suave/fuerte)
+  python generar_voces.py --comparar 5                  (5 frases x 4 ajustes x 3 efectos en .\prueba\comparar)
+  python generar_voces.py --refiltrar --radio 2         (reaplica efecto/volumen a lo generado, sin GPU)
+  python montar_tlk.py --pausa-inicio 50 --pausa-fin 100 --teatro Corea --tlk "<Falcon.tlk ORIGINAL en ingles de ese teatro>"
+  python voces_util.py texto --teatro Corea --id 14 --es "nuevo texto"
+
+Lista_<Teatro>.csv: tlkId;frag;voz;estado;ingles;espanol
+  TRADUCIR = se genera | IGUAL = igual en ambos idiomas (solo se genera si lleva numeros)
+  SIN_TEXTO_ES = se queda el original | ID_INVALIDO = error del FragFile, se ignora
+pronunciaciones.txt: como leer siglas o palabras (texto=pronunciacion).
+
+Montar y retocar:
+  "Montar Falcon.tlk" usa como base el Falcon.tlk que ya esta en el instalador (Ficheros): lo ya
+  traducido no se pierde aunque falte wav_es, y solo se recodifican los wav nuevos o cambiados
+  (montado_<Teatro>.json recuerda que se monto). "↻ + montar" en una fila regenera ese clip, monta
+  el Falcon.tlk de los teatros que lo usan y lo guarda en el instalador, todo seguido.
