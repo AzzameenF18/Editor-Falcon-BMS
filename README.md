@@ -1,4 +1,4 @@
-# Traducción al español de Falcon BMS 4.38
+# Traducción al español de Falcon BMS 4.38 (Experimental)
 
 Traducción no oficial al español de **Falcon BMS 4.38** para los cinco teatros: **Corea**, **Corea Equipo vs Equipo (TvT)**, **Balcanes**, **Grecia (Hellas)** e **Israel**.
 
@@ -6,6 +6,7 @@ Incluye un **instalador** que pone y quita la traducción sin tocar nada más de
 
 > Versión actual: **v1.0 · 2026-11-09**
 
+El instalador hace una copia de los archivos tal cual están para volver al idioma original. No me hago responsable de posibles errores o fallos
 ---
 
 ## Qué se traduce
@@ -14,7 +15,6 @@ Incluye un **instalador** que pone y quita la traducción sin tocar nada más de
 |---|---|---|
 | Menús e interfaz | `.scf`, `.irc` (LckTxtRc y demás) | Todos |
 | Textos e imágenes de los recursos | `.rsc` / `.idx` | Todos |
-| Créditos | `Credits.rsc` | Corea y Balcanes |
 | Campañas, enfrentamientos tácticos y entrenamientos | `.cam`, `.tac`, `.trn`, `.run` | Todos |
 | Subtítulos de las comunicaciones de radio | `F4Talk.csv` | Todos |
 | Voces de radio en español *(en preparación)* | `Falcon.tlk` | Todos |
@@ -25,7 +25,7 @@ Incluye un **instalador** que pone y quita la traducción sin tocar nada más de
 
 ### Requisitos
 
-- **Falcon BMS 4.38** instalado.
+- **Falcon BMS 4.38** instalado. (Preferiblemente recién instalado, con los escenarios ya disponibles)
 - Windows 10 u 11 (el instalador usa PowerShell 5, incluido en Windows).
 
 ### Pasos
