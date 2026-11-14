@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<script src="/i18n.js"></script>
+<title>Editor RSC — Falcon BMS</title>
+<style>
+:root{--bg:#14191F;--pan:#1A2129;--pan2:#212A34;--line:#2E3A47;--txt:#DCE3EA;--dim:#8A98A8;--acc:#E0A13A;--ok:#5BB974;--err:#E5615A;--mod:#E0A13A}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:13px/1.4 "Segoe UI",system-ui,sans-serif}
+header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:var(--pan);border-bottom:1px solid var(--line)}
+header h1{font-size:14px;margin:0 8px 0 0;font-weight:600;color:var(--acc)}
+select,input,button,textarea{font:inherit;color:var(--txt);background:var(--pan2);border:1px solid var(--line);border-radius:5px}
+select,input{padding:4px 6px}
+button{padding:4px 10px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--acc)}
+button:disabled{opacity:.45;cursor:default}
+button.pri{background:var(--acc);color:#14191F;border-color:var(--acc);font-weight:600}
+button.sm{padding:1px 6px;font-size:12px}
+.sp{flex:1}
+#status{color:var(--dim);font-size:12px}
+main{display:flex;height:calc(100% - 46px)}
+#side{width:300px;min-width:220px;border-right:1px solid var(--line);display:flex;flex-direction:column}
+#side .tools{padding:8px;border-bottom:1px solid var(--line);display:flex;gap:6px}
+#side .tools input{flex:1;min-width:0}
+#list{overflow:auto;flex:1}
+#list div{padding:4px 10px;cursor:pointer;display:flex;gap:6px;align-items:center;border-bottom:1px solid #1d252e;white-space:nowrap}
+#list div:hover{background:var(--pan2)}
+#list div.sel{background:#2b3846}
+#list .ty{font-size:10px;padding:0 4px;border-radius:3px;background:#2E3A47;color:var(--dim);min-width:42px;text-align:center}
+#list .ty.t102{background:#33455a;color:#cfe1f5}
+#list .ty.t101{background:#3b3352;color:#ddd1f5}
+#list .nm{overflow:hidden;text-overflow:ellipsis;flex:1}
+#list .mk{color:var(--mod);font-size:11px}
+#list .sz{color:var(--dim);font-size:11px}
+#ed{flex:1;overflow:auto;padding:14px 18px}
+.dim{color:var(--dim)}
+.box{background:var(--pan);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+h2{font-size:15px;margin:0 0 6px}
+.err{color:var(--err)} .ok{color:var(--ok)}
+table.cr{border-collapse:collapse;width:100%}
+table.cr td{padding:2px 4px;border-bottom:1px solid #222b35;vertical-align:top}
+table.cr td.n{color:var(--dim);font-size:11px;width:36px;text-align:right;padding-top:6px}
+table.cr select{padding:2px 4px;font-size:12px}
+table.cr input.tx{width:100%}
+table.cr .en{color:var(--dim);font-size:11px;padding:1px 2px 0}
+table.cr tr.mod input.tx{border-color:var(--mod)}
+table.cr input.tx.bad{border-color:var(--err)}
+table.cr .cnt{font-size:11px;color:var(--dim);white-space:nowrap;padding-top:6px}
+table.cr .cnt.bad{color:var(--err)}
+table.cr tr.blank td{opacity:.6}
+.c-verde{color:#5BD16B}
+textarea{width:100%;min-height:420px;padding:8px;font:12px/1.45 Consolas,monospace;white-space:pre;overflow:auto}
+pre.hex{font:12px/1.4 Consolas,monospace;background:var(--pan2);padding:8px;border-radius:6px;overflow:auto;max-height:520px;margin:0}
+.hide{display:none!important}
+.uso h3{font-size:13px;margin:10px 0 4px;color:var(--acc)}
+.uso .it{padding:3px 0 3px 10px;border-left:2px solid var(--line);margin:2px 0}
+.uso a.abrir{color:var(--txt);font-weight:600;text-decoration:underline;text-decoration-color:var(--acc);text-underline-offset:3px}
+.uso a.abrir:hover{color:var(--acc)}
+.uso .ln{font:11px Consolas,monospace;color:var(--dim);white-space:pre-wrap;word-break:break-all}
+.chk{background-color:#2a2f36;background-image:linear-gradient(45deg,#3a414a 25%,transparent 25%,transparent 75%,#3a414a 75%),linear-gradient(45deg,#3a414a 25%,transparent 25%,transparent 75%,#3a414a 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.imgview{display:inline-block;padding:8px;border-radius:6px;overflow:auto;max-width:100%;max-height:62vh}
+.imgview canvas{display:block;image-rendering:pixelated}
+.cmp{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.cmp .lbl{font-size:11px;color:var(--dim);margin-bottom:4px}
+#side .tools2{padding:0 8px 8px;border-bottom:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
+.gal .it{background:var(--pan);border:1px solid var(--line);border-radius:6px;padding:6px;cursor:pointer;text-align:center;min-width:0}
+.gal .it:hover{border-color:var(--acc)}
+.gal .it.mod{border-color:var(--mod)}
+.gal .th{height:96px;display:flex;align-items:center;justify-content:center;border-radius:4px;overflow:hidden}
+.gal .th canvas{max-width:100%;max-height:96px;image-rendering:pixelated}
+.gal .nm{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:4px}
+.gal .sz{font-size:10px;color:var(--dim)}
+#toast{position:fixed;right:16px;bottom:16px;background:var(--pan2);border:1px solid var(--line);border-left:4px solid var(--acc);padding:10px 14px;border-radius:6px;max-width:520px;box-shadow:0 4px 16px #0008;white-space:pre-line}
+.filt{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Editor RSC · imágenes, textos y sonidos</h1>
+  <label>Teatro <select id="selTh"></select></label>
+  <label>Fichero <select id="selFile" style="max-width:360px"><option value="">—</option></select></label>
+  <button id="bRefresh" title="Volver a buscar ficheros .idx/.rsc">↻</button>
+  <span class="sp"></span>
+  <span id="status"></span>
+  <button id="bSave" class="pri" disabled>Guardar</button>
+</header>
+<main>
+  <section id="side">
+    <div class="tools"><input id="fNombre" placeholder="Buscar recurso…"><select id="fTipo"><option value="">Todos</option><option value="102">Datos</option><option value="101">Sonidos</option><option value="100">Imágenes</option></select></div>
+    <div class="tools2 hide" id="txtTools"><button id="bExpTxt" title="Todos los textos de este .rsc en un solo .txt, para Notepad++ u otro editor">Exportar textos (.txt)</button><button id="bImpTxt" title="Lee el .txt de «Exportar textos» ya editado (ANSI o UTF-8)">Importar textos…</button></div>
+    <div class="tools2 hide" id="imgTools"><button id="bGal" title="Ver todas las imágenes en miniatura">Galería</button><button id="bExpAll" title="Todas las imágenes en PNG dentro de un .zip">Exportar imágenes (.zip)</button><button id="bImpMany" title="Elige uno o varios PNG; se asignan por nombre de fichero">Importar imágenes…</button></div>
+    <div id="carga" class="dim hide" style="padding:6px 10px;font-size:12px;border-bottom:1px solid var(--line)"></div>
+    <div id="list"></div>
+  </section>
+  <section id="ed"><div class="box dim">Elige un teatro y un fichero <b>.rsc</b>.</div></section>
+</main>
+<div id="toast" class="hide"></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const K = new URLSearchParams(location.search).get('k') || '';
+const api = (p, q) => 'api/' + p + '?' + new URLSearchParams(Object.assign({k: K}, q || {}));
+
+/* ---------------- utilidades ---------------- */
+let toastT;
+function toast(t, ms){ const e=$('toast'); e.textContent=t; e.classList.remove('hide'); clearTimeout(toastT); toastT=setTimeout(()=>e.classList.add('hide'), ms||4500); }
+const u16 = (b,o)=> b[o] | (b[o+1]<<8);
+const u32 = (b,o)=> (b[o] | (b[o+1]<<8) | (b[o+2]<<16) | (b[o+3]<<24)) >>> 0;
+const w16 = (b,o,v)=>{ b[o]=v&255; b[o+1]=(v>>8)&255; };
+const w32 = (b,o,v)=>{ b[o]=v&255; b[o+1]=(v>>>8)&255; b[o+2]=(v>>>16)&255; b[o+3]=(v>>>24)&255; };
+const eqBytes = (a,b)=>{ if(a===b) return true; if(!a||!b||a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; };
+const kb = n => n<1024 ? n+' B' : (n/1024).toFixed(n<10240?1:0)+' KB';
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// Windows-1252 (ANSI)
+const DEC = new TextDecoder('windows-1252');
+const ENC = (()=>{ const m=new Map(); const all=new Uint8Array(256); for(let i=0;i<256;i++) all[i]=i;
+  const s=DEC.decode(all); for(let i=0;i<256;i++){ if([0x81,0x8D,0x8F,0x90,0x9D].includes(i)) continue; m.set(s[i], i); } return m; })();
+function ansi(str){ const out=new Uint8Array(str.length); for(let i=0;i<str.length;i++){ const v=ENC.get(str[i]); if(v===undefined) return null; out[i]=v; } return out; }
+const badChars = str => [...new Set([...str].filter(c=>!ENC.has(c)))].join(' ');
+
+function download(name, bytes, type){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([bytes],{type:type||'application/octet-stream'}));
+  a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 1000);
+}
+function pickFile(accept){ return new Promise(res=>{ const i=document.createElement('input'); i.type='file'; if(accept) i.accept=accept;
+  i.onchange=async()=>{ const f=i.files[0]; res(f ? {name:f.name, bytes:new Uint8Array(await f.arrayBuffer())} : null); }; i.click(); }); }
+
+/* ---------------- formato .idx / .rsc ---------------- */
+const TIPOS = {100:'Imagen', 101:'Sonido', 102:'Datos'};
+const TAM = {100:60, 101:52, 102:44};
+function parseIdx(idx){
+  if (idx.length < 8) throw new Error('El .idx es demasiado corto');
+  const total=u32(idx,0), ver=u32(idx,4);
+  if (total+8 > idx.length) throw new Error('El .idx no es un índice de recursos de interfaz');
+  const ents=[]; let p=8;
+  while (p < 8+total){
+    const t=u32(idx,p), n=TAM[t];
+    if (!n || p+n > idx.length) throw new Error('Tipo de recurso desconocido ('+t+') en el .idx: no parece un índice de recursos de interfaz');
+    const id=DEC.decode(idx.subarray(p+4,p+36)).split('\0')[0];
+    const e={type:t, id, pos:p};
+    if (t===100){ e.flags=u32(idx,p+36); e.cx=u16(idx,p+40); e.cy=u16(idx,p+42); e.w=u16(idx,p+44); e.h=u16(idx,p+46); e.off=u32(idx,p+48); e.palSize=u32(idx,p+52); e.palOff=u32(idx,p+56); }
+    if (t===101){ e.flags=u32(idx,p+36); e.channels=u16(idx,p+40); e.soundType=u16(idx,p+42); e.off=u32(idx,p+44); e.headerSize=u32(idx,p+48); }
+    if (t===102){ e.off=u32(idx,p+36); e.size=u32(idx,p+40); }
+    ents.push(e); p+=n;
+  }
+  return {total, ver, ents};
+}
+// WAV: devuelve {ok, fmt, channels, rate, bits, dataOff, dataLen, len}
+function parseWav(b, o){
+  o=o||0;
+  const s4 = q=>String.fromCharCode(b[q],b[q+1],b[q+2],b[q+3]);
+  if (o+12>b.length || s4(o)!=='RIFF' || s4(o+8)!=='WAVE') return {ok:false};
+  const len=u32(b,o+4)+8; const r={ok:true, len};
+  let p=o+12;
+  while (p+8<=o+len && p+8<=b.length){
+    const id=s4(p), sz=u32(b,p+4);
+    if (id==='fmt '){ r.fmt=u16(b,p+8); r.channels=u16(b,p+10); r.rate=u32(b,p+12); r.bits=u16(b,p+22); }
+    if (id==='data'){ r.dataOff=p+8-o; r.dataLen=sz; break; }
+    p+=8+sz+(sz&1);
+  }
+  return r;
+}
+// Sonido dentro del .rsc: desplazamiento respecto al final de la cabecera (8 bytes)
+function soundBytes(rsc, e){
+  for (const base of [8,0]){
+    const w=parseWav(rsc, base+e.off);
+    if (w.ok && base+e.off+w.len<=rsc.length) return {bytes:rsc.slice(base+e.off, base+e.off+w.len), base, wav:w};
+  }
+  return null;
+}
+function resBytes(rsc, e){
+  if (e.type===102) return rsc.slice(8+e.off, 8+e.off+e.size);
+  if (e.type===101){ const s=soundBytes(rsc,e); return s ? s.bytes : null; }
+  return null;
+}
+
+/* ---------------- texto para editores externos ---------------- */
+// Lee un .txt guardado en ANSI o en UTF-8 (con o sin BOM), como lo guarde Notepad++
+function readTxt(b){
+  if (b.length>=3 && b[0]===0xEF && b[1]===0xBB && b[2]===0xBF) return new TextDecoder('utf-8').decode(b.subarray(3));
+  if (b.some(x=>x>=0x80)){ try { return new TextDecoder('utf-8',{fatal:true}).decode(b); } catch(e){} }
+  return DEC.decode(b);
+}
+const CR_TOK={2:'TITULO',3:'LINEA',4:'PARRAFO'};
+function creditsToLines(rows){
+  return rows.map(x=> x.t===6 ? 'BLANCO' : CR_TOK[x.t]+(x.hdr && x.hdr.join()!==CR_HDR[x.t].join() ? '@'+x.hdr.join(',') : '')+'|'
+    +(x.col&&x.col.join()===COL_VERDE.join()?'VERDE':(x.col&&x.col.join()===COL_BLANCO.join()?'BLANCO':x.col.join(',')))+'|'+x.text);
+}
+function linesToCredits(L){
+  const T={TITULO:2,LINEA:3,PARRAFO:4};
+  return L.map((l,i)=>{
+    if (l.trim()==='BLANCO') return {t:6};
+    const m=l.match(/^(TITULO|LINEA|PARRAFO)(?:@([\d,]+))?\|([^|]*)\|(.*)$/); if(!m) throw new Error('línea '+(i+1)+': formato no válido');
+    const h=m[2] ? m[2].split(',').map(Number) : CR_HDR[T[m[1]]].slice();
+    if (h.length!==4||h.some(v=>!(v>=0&&v<=255))) throw new Error('línea '+(i+1)+': valor @ no válido');
+    const c=m[3]==='VERDE'?COL_VERDE.slice():(m[3]==='BLANCO'?COL_BLANCO.slice():m[3].split(',').map(Number));
+    if (c.length!==4||c.some(v=>!(v>=0&&v<=255))) throw new Error('línea '+(i+1)+': color no válido');
+    const b=ansi(m[4]); if (!b) throw new Error('línea '+(i+1)+': caracteres no admitidos (ANSI): '+badChars(m[4]));
+    if (b.length>CR_LEN[T[m[1]]]-9) throw new Error('línea '+(i+1)+': texto demasiado largo ('+b.length+'/'+(CR_LEN[T[m[1]]]-9)+')');
+    return {t:T[m[1]], hdr:h, col:c, text:m[4]}; });
+}
+const splitLines = str => { const L=str.split(/\r?\n/); if (L.length && L[L.length-1]==='') L.pop(); return L; };
+// texto plano: se respeta el tipo de salto de línea del original
+function textFromTxt(str, orig){
+  const crlf = DEC.decode(orig).includes('\r\n');
+  const t = crlf ? str.replace(/\r?\n/g,'\r\n') : str.replace(/\r\n/g,'\n');
+  const b=ansi(t); if (!b) throw new Error('caracteres no admitidos (ANSI): '+badChars(t)); return b;
+}
+function textKind(r){ if (r.e.type!==102 || !r.data) return null; if (parseCredits(r.data)) return 'CREDITOS'; if (isText(r.data)) return 'TEXTO'; return null; }
+function exportTexts(){
+  const out=[]; let n=0;
+  for (const r of CUR.res){
+    const k=textKind(r); if (!k) continue; n++;
+    if (k==='CREDITOS'){ out.push('@@@ '+r.e.id+' CREDITOS'); out.push(...creditsToLines(parseCredits(r.data))); }
+    else { const t=DEC.decode(r.data).replace(/\r\n/g,'\n'); const fin=t.endsWith('\n');
+      out.push('@@@ '+r.e.id+' TEXTO'+(fin?'':' SIN_SALTO_FINAL')); out.push(...(fin?t.slice(0,-1):t).split('\n')); }
+  }
+  const b=ansi(out.join('\r\n')+'\r\n');
+  download(CUR.f.n+'_textos.txt', b, 'text/plain'); toast('Exportados '+n+' recurso(s) de texto a '+CUR.f.n+'_textos.txt.\nEdítalo con Notepad++ (en ANSI o UTF-8) sin tocar las líneas que empiezan por @@@.');
+}
+async function importTexts(){
+  const f=await pickFile('.txt'); if (!f) return;
+  const L=splitLines(readTxt(f.bytes)); const secs=[]; let cur=null;
+  for (const l of L){ const m=l.match(/^@@@ (\S+) (CREDITOS|TEXTO)( SIN_SALTO_FINAL)?\s*$/);
+    if (m){ cur={id:m[1], k:m[2], fin:!m[3], L:[]}; secs.push(cur); } else if (cur) cur.L.push(l); }
+  if (!secs.length){ toast('Ese fichero no tiene ninguna línea "@@@ RECURSO TIPO". Usa uno creado con "Exportar textos".'); return; }
+  const map=new Map(CUR.res.filter(r=>r.e.type===102).map(r=>[r.e.id.toUpperCase(), r]));
+  let cambia=0, igual=0; const errs=[], sin=[];
+  for (const sc of secs){
+    const r=map.get(sc.id.toUpperCase()); if (!r){ sin.push(sc.id); continue; }
+    try {
+      const nb = sc.k==='CREDITOS' ? buildCredits(linesToCredits(sc.L)) : textFromTxt(sc.L.join('\n')+(sc.fin?'\n':''), r.orig);
+      if (eqBytes(nb, r.data)) igual++; else { r.data=nb; cambia++; }
+    } catch(e){ errs.push(sc.id+': '+e.message); }
+  }
+  updState(); if (SEL!=null) select(SEL);
+  toast(cambia+' recurso(s) cambiados, '+igual+' sin cambios.'+(sin.length?'\nNo existen en este .rsc: '+sin.join(', '):'')+(errs.length?'\nNo importados:\n'+errs.join('\n'):''), 10000);
+}
+
+/* ---------------- imágenes (mismo método que el editor RSC de imágenes) ---------------- */
+// 16 bits RGB555 (flag 0x2) o 8 bits con paleta RGB555 (flag 0x1); flag 0x40000000 = magenta transparente
+const FLAG_PAL=1, FLAG_16=2, FLAG_KEY=0x40000000, KEY555=0x7C1F;
+const D5=v=>Math.floor(v*255/31), E5=c=>Math.floor((c*31+127)/255);
+const to555=(r,g,b)=>(E5(r)<<10)|(E5(g)<<5)|E5(b);
+const isPal=e=>(e.flags&FLAG_PAL)!==0;
+function px555(rsc, e){
+  const n=e.w*e.h, px=new Uint16Array(n), o=8+e.off;
+  if (isPal(e)){
+    if (o+n>rsc.length || 8+e.palOff+e.palSize*2>rsc.length) return null;
+    for (let i=0;i<n;i++){ const k=rsc[o+i]; px[i]= k<e.palSize ? (u16(rsc,8+e.palOff+k*2)&0x7FFF) : KEY555; }
+  } else {
+    if (o+n*2>rsc.length) return null;
+    for (let i=0;i<n;i++) px[i]=u16(rsc,o+i*2)&0x7FFF;
+  }
+  return px;
+}
+function imgCanvas(im, transp){
+  const c=document.createElement('canvas'); c.width=Math.max(1,im.w); c.height=Math.max(1,im.h);
+  if (!im.w || !im.h) return c;
+  const ctx=c.getContext('2d'), id=ctx.createImageData(im.w,im.h), d=id.data;
+  for (let i=0;i<im.px.length;i++){ const v=im.px[i];
+    d[i*4]=D5((v>>10)&31); d[i*4+1]=D5((v>>5)&31); d[i*4+2]=D5(v&31); d[i*4+3]=(transp && v===KEY555)?0:255; }
+  ctx.putImageData(id,0,0); return c;
+}
+const pngOf = im => new Promise(res=>imgCanvas(im,false).toBlob(b=>b.arrayBuffer().then(a=>res(new Uint8Array(a))),'image/png'));
+// Lee un PNG/BMP/JPG como RGB555. Magenta casi puro o píxel transparente -> color transparente
+async function readImage(bytes){
+  const bmp=await createImageBitmap(new Blob([bytes]),{colorSpaceConversion:'none',premultiplyAlpha:'none'});
+  const c=document.createElement('canvas'); c.width=bmp.width; c.height=bmp.height;
+  const ctx=c.getContext('2d'); ctx.drawImage(bmp,0,0); const d=ctx.getImageData(0,0,c.width,c.height).data;
+  const px=new Uint16Array(c.width*c.height); let alfa=0;
+  for (let i=0;i<px.length;i++){ const r=d[i*4],g=d[i*4+1],b=d[i*4+2],a=d[i*4+3];
+    if (a<128){ px[i]=KEY555; alfa++; } else if (r>=248&&g<=7&&b>=248) px[i]=KEY555; else px[i]=to555(r,g,b); }
+  return {w:c.width, h:c.height, px, alfa};
+}
+const samePx=(a,b)=> a && b && a.w===b.w && a.h===b.h && eqBytes(a.px,b.px);
+// imagen actual (cambiada o la del fichero abierto) y la del juego
+function baseImg(r){ if (!r.base0){ const px=px555(CUR.rsc,r.e); r.base0= px ? {w:r.e.w,h:r.e.h,px} : null; } return r.base0; }
+const curImg = r => r.img || baseImg(r);
+function gameImg(r){ if (r.g0===undefined){ const px= r.gE ? px555(CUR.gRsc,r.gE) : null; r.g0 = px ? {w:r.gE.w,h:r.gE.h,px,cx:r.gE.cx,cy:r.gE.cy} : null; } return r.g0; }
+function setImg(r, im){ r.img = samePx(im, baseImg(r)) && !im.cx ? null : im; r.vsGame=undefined; }
+
+// ZIP sin compresión
+const CRC=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c= c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+const crc32=b=>{ let c=0xFFFFFFFF; for (let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; };
+function makeZip(files){
+  const parts=[], cen=[]; let off=0;
+  for (const f of files){
+    const nm=new TextEncoder().encode(f.name), crc=crc32(f.bytes), n=f.bytes.length;
+    const h=new Uint8Array(30+nm.length); w32(h,0,0x04034b50); w16(h,4,20); w16(h,6,0x800); w32(h,14,crc); w32(h,18,n); w32(h,22,n); w16(h,26,nm.length); h.set(nm,30);
+    const c=new Uint8Array(46+nm.length); w32(c,0,0x02014b50); w16(c,4,20); w16(c,6,20); w16(c,8,0x800); w32(c,16,crc); w32(c,20,n); w32(c,24,n); w16(c,28,nm.length); w32(c,42,off); c.set(nm,46);
+    parts.push(h,f.bytes); cen.push(c); off+=h.length+n;
+  }
+  const cs=cen.reduce((a,c)=>a+c.length,0), e=new Uint8Array(22);
+  w32(e,0,0x06054b50); w16(e,8,files.length); w16(e,10,files.length); w32(e,12,cs); w32(e,16,off);
+  const out=new Uint8Array(off+cs+22); let o=0; for (const x of [...parts,...cen,e]){ out.set(x,o); o+=x.length; } return out;
+}
+
+/* ---------------- créditos (cifrado XOR encadenado) ---------------- */
+const KEY = new TextEncoder().encode('Falcon is your Master');
+const CR_LEN = {2:60, 3:208, 4:108};
+const CR_NOM = {2:'Título', 3:'Línea', 4:'Párrafo', 6:'(en blanco)'};
+const CR_HDR = {2:[116,0,0,0], 3:[120,0,0,0], 4:[120,0,0,0]};
+const COL_BLANCO=[255,255,255,0], COL_VERDE=[0,255,0,0];
+function cryptDec(src, o, n){ const p=new Uint8Array(n); let prev=0; for(let j=0;j<n;j++){ const c=src[o+j]; p[j]=c^prev^KEY[j%KEY.length]; prev=c; } return p; }
+function cryptEnc(p){ const c=new Uint8Array(p.length); let prev=0; for(let j=0;j<p.length;j++){ c[j]=p[j]^prev^KEY[j%KEY.length]; prev=c[j]; } return c; }
+function parseCredits(b){
+  const rows=[]; let i=0;
+  while (i<b.length){
+    if (i+2>b.length) return null;
+    const t=u16(b,i); i+=2;
+    if (t===6){ rows.push({t:6}); continue; }
+    const n=CR_LEN[t]; if (!n || i+n>b.length) return null;
+    const p=cryptDec(b,i,n); i+=n;
+    const z=p.indexOf(0,8); if (z<0) return null;
+    for (let q=z;q<n;q++) if (p[q]!==0) return null;   // relleno con ceros
+    rows.push({t, hdr:[...p.subarray(0,4)], col:[...p.subarray(4,8)], text:DEC.decode(p.subarray(8,z))});
+  }
+  return rows.length && rows.some(r=>r.t!==6) ? rows : null;
+}
+function buildCredits(rows){
+  const parts=[]; let tot=0;
+  for (const r of rows){
+    const h=new Uint8Array(2); w16(h,0,r.t); parts.push(h); tot+=2;
+    if (r.t===6) continue;
+    const n=CR_LEN[r.t], p=new Uint8Array(n);
+    p.set(r.hdr || CR_HDR[r.t], 0); p.set(r.col || COL_BLANCO, 4);
+    const tb=ansi(r.text); if (!tb) throw new Error('Carácter no válido en: '+r.text);
+    if (tb.length>n-9) throw new Error('Texto demasiado largo ('+tb.length+'/'+(n-9)+'): '+r.text);
+    p.set(tb, 8);
+    const c=cryptEnc(p); parts.push(c); tot+=c.length;
+  }
+  const out=new Uint8Array(tot); let o=0; for (const x of parts){ out.set(x,o); o+=x.length; } return out;
+}
+function isText(b){
+  if (!b.length) return false;
+  let bad=0; for (const x of b){ if (x===9||x===10||x===13||(x>=32&&x!==127&&![0x81,0x8D,0x8F,0x90,0x9D].includes(x))) continue; bad++; }
+  return bad/b.length < 0.01;
+}
+
+/* ---------------- dónde se usa (según los .scf, .irc y listas .lst del juego) ---------------- */
+const PANTALLAS = [['Main','Principal'],['Cmn','Comunes (varias pantallas)'],['Cs','Selección de campaña'],['Cp','Campaña'],
+  ['Ts','Selección de enfrentamiento táctico'],['TeNew','Nuevo enfrentamiento táctico'],['Te','Enfrentamiento táctico'],['Df','Dogfight'],
+  ['Ia','Instant Action'],['Pln','Planificador'],['Ref','Referencia táctica'],['Lb','Logbook'],['St','Configuración'],
+  ['Comm','Comunicaciones'],['Ac','ACMI'],['Pop','Menús emergentes'],['Help','Ayuda']];
+const nombrePantalla = k => (PANTALLAS.find(x => x[0].toLowerCase() === String(k).toLowerCase()) || [k, k])[1];
+const ordenPantalla = k => { const i=PANTALLAS.findIndex(x => x[0].toLowerCase() === String(k).toLowerCase()); return i<0 ? 90 : i; };
+async function cargaDe(f){
+  const el=$('carga'); el.classList.add('hide'); el.textContent='';
+  try {
+    const r=await fetch(api('carga',{t:$('selTh').value, rsc:f.rsc})); if (!r.ok) return;
+    const j=await r.json(); const ps=[].concat(j.pantallas||[]), ir=[].concat(j.ircs||[]);
+    el.textContent = ps.length ? 'Lo cargan: '+ps.map(nombrePantalla).join(', ') : (ir.length ? 'Lo carga '+ir.map(x=>x.p).join(', ')+' (ninguna lista *_Res.lst lo incluye)' : 'Ninguna lista de pantalla lo carga (puede cargarlo el propio juego)');
+    el.title = ir.map(x=>x.p+'  ['+x.recurso+']').join('\n');
+    el.classList.remove('hide');
+  } catch(e){}
+}
+// Busca dónde se usa el recurso y lo muestra debajo del panel (se llama al elegir un recurso)
+let usoSeq=0;
+async function mostrarUso(r, scroll){
+  const seq=++usoSeq;
+  let box=$('usoBox'); if (!box){ box=document.createElement('div'); box.id='usoBox'; box.className='box uso'; $('ed').appendChild(box); }
+  box.innerHTML='<h2>¿Dónde se usa '+esc(r.e.id)+'?</h2><div class="dim">Buscando en los .scf e .irc del teatro… (la primera vez tarda unos segundos)</div>';
+  let res, err=null;
+  try {
+    const q=await fetch(api('uso',{t:$('selTh').value, id:r.e.id}));
+    if (!q.ok) err='el editor ha respondido HTTP '+q.status;
+    else { const j=await q.json(); if (j && !Array.isArray(j) && j.error) err=j.error; else res=[].concat(j||[]); }
+  } catch(e){ err=e.message; }
+  if (seq!==usoSeq || !document.body.contains(box)) return;   // ya se eligió otro recurso
+  const sum0=$('usoSum'); if (sum0 && (err || !res.length)) sum0.textContent = err ? 'Se usa en: no se ha podido buscar' : 'Se usa en: ningún .scf';
+  if (err){ box.innerHTML='<h2>¿Dónde se usa '+esc(r.e.id)+'?</h2><div class="err">No se ha podido buscar: '+esc(err)+'</div><div class="dim">Si el error persiste, mira la ventana de PowerShell del editor y pásame lo que ponga.</div>'; return; }
+  if (!res.length){ box.innerHTML='<h2>¿Dónde se usa '+esc(r.e.id)+'?</h2><div class="dim">No aparece en ningún .scf ni .irc del teatro. Puede usarlo directamente el juego (desde su código), o no usarse.</div>'; return; }
+  const scf=res.filter(x=>x.ext==='.scf'), irc=res.filter(x=>x.ext!=='.scf');
+  const grupos={};
+  scf.forEach(x=>{ const ps=[].concat(x.pantallas||[]); (ps.length?ps:['?']).forEach(k=>{ (grupos[k]=grupos[k]||[]).push(x); }); });
+  const enMarco = window.parent!==window;
+  const item=x=>'<div class="it">'+(x.ext==='.scf' && enMarco ? '<a href="#" class="abrir" data-p="'+esc(x.p)+'" title="Abrir este .scf en la pestaña SCF">'+esc(x.p)+'</a>' : '<b>'+esc(x.p)+'</b>')+(x.general?' <span class="dim">(de Corea)</span>':'')+(x.n>1?' <span class="dim">· '+x.n+' veces</span>':'')+'<div class="ln">'+esc(x.linea||'')+'</div></div>';
+  let h='<h2>¿Dónde se usa '+esc(r.e.id)+'?</h2><div class="dim">'+scf.length+' .scf'+(irc.length?' y '+irc.length+' .irc':'')+'. Si lo cambias, cambia en todos ellos.</div>';
+  Object.keys(grupos).sort((a,b)=>ordenPantalla(a)-ordenPantalla(b)).forEach(k=>{ h+='<h3>'+(k==='?'?'Sin pantalla (ninguna lista *_Scf.lst lo carga)':esc(nombrePantalla(k)))+'</h3>'+grupos[k].map(item).join(''); });
+  if (irc.length) h+='<h3>Ficheros .irc</h3>'+irc.map(item).join('');
+  box.innerHTML=h; if (scroll) box.scrollIntoView({behavior:'smooth'});
+  box.querySelectorAll('a.abrir').forEach(a=>a.onclick=ev=>{ ev.preventDefault();
+    window.parent.postMessage({tipo:'abrirScf', teatro:$('selTh').value, p:a.dataset.p}, location.origin); });
+  const sum=$('usoSum'); if (sum) sum.textContent = 'Se usa en: '+(Object.keys(grupos).filter(k=>k!=='?').map(nombrePantalla).join(', ')||'—')+' ('+scf.length+' .scf)';
+}
+function botonUso(r, host){
+  const b=document.createElement('button'); b.textContent='¿Dónde se usa?'; b.title='Ir a la lista de .scf e .irc donde aparece '+r.e.id;
+  b.onclick=()=>{ const box=$('usoBox'); if (box) box.scrollIntoView({behavior:'smooth'}); else mostrarUso(r, true); };
+  host.appendChild(b);
+}
+
+/* ---------------- estado ---------------- */
+let INFO=null, FILES=[], CUR=null, SEL=null;
+// CUR = {f, idx, rsc, base:'juego'|'editado', p, gp (parse del juego), gRsc, res:[{e, gE, kind, orig, data, extra}]}
+
+async function getBytes(p, src){ const r=await fetch(api('file',{p, src})); if(!r.ok) throw new Error('No se pudo leer '+p); return new Uint8Array(await r.arrayBuffer()); }
+
+async function init(){
+  try {
+    const r=await fetch(api('info')); if(!r.ok) throw 0;
+    INFO=await r.json();
+  } catch(e){ $('ed').innerHTML='<div class="box err">No hay conexión con el editor. Ábrelo con <b>Editor_RSC_Datos.bat</b>.</div>'; return; }
+  const s=$('selTh'); s.innerHTML='';
+  INFO.teatros.forEach(t=>{ const o=document.createElement('option'); o.value=t.prefijo; o.textContent=t.nombre; s.appendChild(o); });
+  let last=null; try{ last=localStorage.getItem('rscDatosTh'); }catch(e){}
+  if (last!==null && INFO.teatros.some(t=>t.prefijo===last)) s.value=last;
+  $('status').textContent=INFO.bms;
+  setInterval(()=>fetch(api('ping')).catch(()=>{}), 60000);
+  await loadList();
+  if (window.parent!==window) window.parent.postMessage({tipo:'listo', modulo:'rsc'}, location.origin);
+}
+// Desde la pestaña SCF: abrir un .rsc y seleccionar un recurso ({tipo:'abrirRsc', teatro, rsc: ruta relativa a Data, id})
+window.addEventListener('message', async ev=>{
+  if (ev.origin!==location.origin) return;
+  const m=ev.data||{}; if (m.tipo!=='abrirRsc' || !INFO) return;
+  const th=m.teatro||'';
+  if (!INFO.teatros.some(t=>t.prefijo===th)){ toast('Este teatro no está en el editor RSC: '+th); return; }
+  if ($('selTh').value!==th){
+    if (dirty() && !confirm('Hay cambios sin guardar. ¿Descartarlos?')) return;
+    CUR=null; SEL=null; renderList(); $('ed').innerHTML=''; updState();
+    $('selTh').value=th; await loadList();
+  }
+  const want=String(m.rsc).toLowerCase();
+  const i=FILES.findIndex(f=>f.rsc.toLowerCase()===want);
+  if (i<0){ toast('No encuentro '+m.rsc+' en este teatro'); return; }
+  if (!CUR || CUR.fi!==String(i)){
+    $('selFile').value=String(i); await openFile(String(i));
+    if (!CUR || CUR.fi!==String(i)) return;          // el usuario no quiso descartar cambios
+  }
+  if (m.id){
+    const k=CUR.res.findIndex(r=>r.e.id.toUpperCase()===String(m.id).toUpperCase());
+    if (k<0){ toast(m.id+' no está en '+CUR.f.n+'.rsc'); return; }
+    $('fNombre').value=''; $('fTipo').value='';
+    SEL=k; renderList(); select(k);
+    const d=$('list').querySelector('.sel'); if (d) d.scrollIntoView({block:'center'});
+  }
+});
+async function loadList(refresh){
+  const t=$('selTh').value; try{ localStorage.setItem('rscDatosTh', t); }catch(e){}
+  $('selFile').innerHTML='<option value="">Buscando…</option>';
+  const r=await fetch(api('list',{t, r: refresh?'1':'0'})); FILES=r.ok ? await r.json() : [];
+  if (!Array.isArray(FILES)) FILES=[FILES];
+  const s=$('selFile'); s.innerHTML='';
+  const o0=document.createElement('option'); o0.value=''; o0.textContent='— elige un .rsc ('+FILES.length+') —'; s.appendChild(o0);
+  const groups={};
+  FILES.forEach((f,i)=>{ const d=f.idx.includes('\\') ? f.idx.slice(0,f.idx.lastIndexOf('\\')) : '(Data)'; (groups[d]=groups[d]||[]).push([f,i]); });
+  Object.keys(groups).sort().forEach(g=>{ const og=document.createElement('optgroup'); og.label=g;
+    groups[g].forEach(([f,i])=>{ const o=document.createElement('option'); o.value=i; o.textContent=(f.ed?'● ':'')+f.n+'.rsc  ('+kb(f.s)+')'; og.appendChild(o); }); s.appendChild(og); });
+}
+
+const changed = r => r.e.type===100 ? !!r.img : !!(r.data && !eqBytes(r.data, r.orig));
+function vsGame(r){
+  if (r.e.type!==100) return !!(r.data && r.game && !eqBytes(r.data, r.game));
+  if (r.vsGame===undefined){ const g=gameImg(r), c=curImg(r); r.vsGame = !!(g && c && !samePx(g,c)); }
+  return r.vsGame;
+}
+function dirty(){ return CUR && CUR.res.some(changed); }
+function updState(){
+  $('bSave').disabled = !CUR || !dirty();
+  if (CUR){
+    const n=CUR.res.filter(changed).length;
+    $('status').textContent = CUR.f.rsc + (CUR.base==='editado' ? '  · versión editada' : '  · original del juego') + (n ? '  · '+n+' recurso(s) sin guardar' : '');
+  }
+  renderList();
+}
+
+async function openFile(i){
+  if (dirty() && !confirm('Hay cambios sin guardar. ¿Descartarlos?')){ $('selFile').value=CUR.fi; return; }
+  if (i===''){ $('carga').classList.add('hide'); $('imgTools').classList.add('hide'); $('txtTools').classList.add('hide'); CUR=null; SEL=null; renderList(); $('ed').innerHTML=''; updState(); return; }
+  const f=FILES[+i];
+  let base='juego';
+  if (f.ed) base = confirm(f.n+'.rsc ya tiene una versión editada (en Ficheros del instalador).\n\nAceptar: seguir con tu versión editada.\nCancelar: empezar desde el original del juego.') ? 'editado' : 'juego';
+  try {
+    const gIdx=await getBytes(f.idx,'juego'), gRsc=await getBytes(f.rsc,'juego');
+    const idx = base==='editado' ? await getBytes(f.idx,'editado') : gIdx;
+    const rsc = base==='editado' ? await getBytes(f.rsc,'editado') : gRsc;
+    const p=parseIdx(idx), gp=parseIdx(gIdx);
+    if (u32(rsc,4)!==p.ver) toast('Aviso: la versión del .rsc no coincide con la del .idx.');
+    const gMap=new Map(gp.ents.map(e=>[e.type+':'+e.id, e]));
+    const res=p.ents.map(e=>{
+      const gE=gMap.get(e.type+':'+e.id);
+      const r={e, gE, orig:null, data:null};
+      if (e.type!==100){ r.orig=resBytes(rsc,e); r.data=r.orig; r.game = gE ? resBytes(gRsc,gE) : null; }
+      return r;
+    });
+    CUR={f, fi:i, idx, rsc, base, p, gRsc, res};
+    cargaDe(f);
+    $('imgTools').classList.toggle('hide', !res.some(r=>r.e.type===100));
+    $('txtTools').classList.toggle('hide', !res.some(r=>textKind(r)));
+    SEL=null;
+    const first=res.find(r=>r.e.type===102) || res.find(r=>r.e.type===101);
+    renderList(); if (first) select(res.indexOf(first)); else if (res.length) showGallery(); else $('ed').innerHTML='<div class="box dim">Este .rsc no tiene recursos.</div>';
+    updState();
+  } catch(e){ CUR=null; renderList(); $('ed').innerHTML='<div class="box err">'+esc(e.message)+'</div>'; updState(); }
+}
+
+function renderList(){
+  const L=$('list'); L.innerHTML='';
+  if (!CUR) return;
+  const fn=$('fNombre').value.trim().toLowerCase(), ft=$('fTipo').value;
+  CUR.res.forEach((r,i)=>{
+    if (ft && r.e.type!==+ft) return;
+    if (fn && !r.e.id.toLowerCase().includes(fn)) return;
+    const d=document.createElement('div'); if (i===SEL) d.className='sel';
+    const ci = r.e.type===100 ? (r.img || r.e) : null;
+    const sz = ci ? ci.w+'×'+ci.h : (r.data ? kb(r.data.length) : '?');
+    d.innerHTML='<span class="ty t'+r.e.type+'">'+TIPOS[r.e.type]+'</span><span class="nm">'+esc(r.e.id)+'</span>'
+      +(changed(r) ? '<span class="mk" title="Cambiado, sin guardar">✎</span>' : (vsGame(r) ? '<span class="mk" title="Distinto del original del juego">●</span>' : ''))
+      +'<span class="sz">'+sz+'</span>';
+    d.onclick=()=>select(i);
+    L.appendChild(d);
+  });
+}
+
+/* ---------------- panel derecho ---------------- */
+let audioUrl=null;
+function select(i){
+  selectPanel(i);
+  const r=CUR && CUR.res[i];
+  const h2=$('ed').querySelector('.box h2');
+  if (r && h2){ const d=document.createElement('div'); d.id='usoSum'; d.className='row'; d.style.color='var(--acc)'; d.textContent='Se usa en: buscando…'; h2.after(d); mostrarUso(r, false); }
+}
+function selectPanel(i){
+  SEL=i; renderList();
+  const r=CUR.res[i], e=r.e, ed=$('ed');
+  if (audioUrl){ URL.revokeObjectURL(audioUrl); audioUrl=null; }
+  const head='<h2>'+esc(e.id)+' <span class="dim" style="font-weight:400">· '+TIPOS[e.type]+'</span></h2>';
+  if (e.type===100) return showImage(r, head);
+  if (!r.data){ ed.innerHTML='<div class="box">'+head+'<div class="err">No se ha podido leer este recurso en el .rsc.</div></div>'; return; }
+  if (e.type===101) return showSound(r, head);
+  const cr=parseCredits(r.data);
+  if (cr) return showCredits(r, head, cr);
+  if (isText(r.data)) return showText(r, head);
+  showBinary(r, head);
+}
+
+function commonButtons(r){
+  const box=document.createElement('div'); box.className='row';
+  const plano = r.e.type===102 && isText(r.data) && !parseCredits(r.data);
+  const b1=document.createElement('button'); b1.textContent= r.e.type===101 ? 'Exportar .wav' : (plano ? 'Exportar .txt' : (parseCredits(r.data) ? 'Exportar cifrado (.bin)' : 'Exportar .bin'));
+  b1.title= plano ? 'Para editarlo con Notepad++ u otro editor' : 'Guardar este recurso como fichero suelto, tal cual está en el .rsc';
+  b1.onclick=()=>download(r.e.id+(r.e.type===101?'.wav':(plano?'.txt':'.bin')), r.data);
+  const b2=document.createElement('button'); b2.textContent='Descartar cambios'; b2.disabled=eqBytes(r.data,r.orig);
+  b2.onclick=()=>{ r.data=r.orig; r.extra=null; updState(); select(SEL); };
+  const b3=document.createElement('button'); b3.textContent='Volver al original del juego'; b3.disabled=!r.game || eqBytes(r.data,r.game);
+  b3.title='Recupera el contenido de este recurso tal como está en la instalación del juego';
+  b3.onclick=()=>{ r.data=r.game; r.extra = r.e.type===101 ? wavExtra(r.game) : null; updState(); select(SEL); };
+  box.append(b1,b2,b3); botonUso(r, box); return box;
+}
+
+/* --- créditos --- */
+function showCredits(r, head, rows){
+  const gRows = r.game ? parseCredits(r.game) : null;
+  const same = gRows && gRows.length===rows.length;
+  rows.forEach((x,i)=>{ x.en = same && gRows[i].t===x.t ? gRows[i].text : null; });
+  const ed=$('ed'); ed.innerHTML='';
+  const box=document.createElement('div'); box.className='box';
+  box.innerHTML=head+'<div class="dim">Texto de créditos cifrado ('+rows.length+' líneas). Debajo de cada línea, en gris, el texto del juego. '
+    +'Máximo de caracteres: Título 51 · Línea 199 · Párrafo 99. Acepta tildes y ñ (ANSI). En las líneas de nombre + cargo el juego muestra el texto tal cual, sin separar.</div>';
+  box.appendChild(commonButtons(r));
+  const fl=document.createElement('div'); fl.className='filt';
+  fl.innerHTML='<input id="crF" placeholder="Filtrar texto…" style="width:240px"><label><input type="checkbox" id="crM"> Solo cambiados respecto al juego</label>';
+  box.appendChild(fl);
+  const bx=document.createElement('button'); bx.textContent='Exportar .txt'; bx.title='Una línea por fila: TIPO|COLOR|texto, para editar con Notepad++ u otro editor';
+  bx.onclick=()=>download(r.e.id+'.txt', ansi(creditsToLines(rows).join('\r\n')+'\r\n'), 'text/plain');
+  const bi=document.createElement('button'); bi.textContent='Importar .txt…'; bi.title='Lee un .txt con el formato de "Exportar .txt" (ANSI o UTF-8)';
+  bi.onclick=async()=>{ const f=await pickFile('.txt'); if(!f) return;
+    try {
+      const nr=linesToCredits(splitLines(readTxt(f.bytes)));
+      r.data=buildCredits(nr); updState(); select(SEL); toast('Importadas '+nr.length+' líneas.');
+    } catch(e){ toast('No se ha importado: '+e.message); } };
+  box.lastChild.append(bx,bi);
+  ed.appendChild(box);
+  const tb=document.createElement('table'); tb.className='cr'; ed.appendChild(tb);
+  let timer=null;
+  const commit=()=>{ clearTimeout(timer); timer=setTimeout(()=>{ try{ r.data=buildCredits(rows); updState(); }catch(e){} }, 150); };
+  function draw(){
+    tb.innerHTML='';
+    const f=$('crF').value.toLowerCase(), m=$('crM').checked;
+    rows.forEach((x,i)=>{
+      if (f && !((x.text||'').toLowerCase().includes(f) || (x.en||'').toLowerCase().includes(f))) return;
+      if (m && (x.en===null || x.text===x.en)) return;
+      const tr=document.createElement('tr'); if (x.t===6) tr.className='blank';
+      if (x.en!=null && x.text!==x.en) tr.classList.add('mod');
+      const tdN=document.createElement('td'); tdN.className='n'; tdN.textContent=i+1;
+      const tdT=document.createElement('td');
+      const sT=document.createElement('select'); [2,3,4,6].forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=CR_NOM[t]; sT.appendChild(o); }); sT.value=x.t;
+      sT.onchange=()=>{ x.t=+sT.value; if (x.t!==6){ x.hdr=CR_HDR[x.t].slice(); x.col=x.col||COL_BLANCO.slice(); x.text=x.text||''; } commit(); draw(); };
+      tdT.appendChild(sT);
+      const tdC=document.createElement('td');
+      if (x.t!==6){
+        const sC=document.createElement('select'); sC.innerHTML='<option value="b">Blanco</option><option value="v">Verde</option>';
+        const isV = x.col && x.col.join()===COL_VERDE.join(); const isB = x.col && x.col.join()===COL_BLANCO.join();
+        if (!isV && !isB){ const o=document.createElement('option'); o.value='o'; o.textContent='Otro'; sC.appendChild(o); }
+        sC.value = isV?'v':(isB?'b':'o'); if (sC.value==='v') sC.className='c-verde';
+        sC.onchange=()=>{ if (sC.value==='v') x.col=COL_VERDE.slice(); else if (sC.value==='b') x.col=COL_BLANCO.slice(); sC.className=sC.value==='v'?'c-verde':''; commit(); };
+        tdC.appendChild(sC);
+      }
+      const tdX=document.createElement('td'); tdX.style.width='100%';
+      const tdK=document.createElement('td'); tdK.className='cnt';
+      if (x.t!==6){
+        const inp=document.createElement('input'); inp.className='tx'; inp.value=x.text; inp.spellcheck=true;
+        const max=CR_LEN[x.t]-9;
+        const chk=()=>{ const b=ansi(inp.value); const bad = !b || b.length>max;
+          inp.classList.toggle('bad', bad); tdK.textContent=(b?b.length:'?')+'/'+max; tdK.classList.toggle('bad',bad);
+          inp.title = !b ? 'Caracteres no admitidos: '+badChars(inp.value) : ''; return !bad; };
+        inp.oninput=()=>{ if (chk()){ x.text=inp.value; tr.classList.toggle('mod', x.en!=null && x.text!==x.en); commit(); } };
+        chk(); tdX.appendChild(inp);
+        if (x.en!=null){ const en=document.createElement('div'); en.className='en'; en.textContent=x.en; tdX.appendChild(en); }
+      }
+      const tdB=document.createElement('td'); tdB.style.whiteSpace='nowrap';
+      const bA=document.createElement('button'); bA.className='sm'; bA.textContent='+'; bA.title='Insertar una línea debajo';
+      bA.onclick=()=>{ rows.splice(i+1,0,{t:x.t===6?3:x.t, hdr:CR_HDR[x.t===6?3:x.t].slice(), col:COL_BLANCO.slice(), text:'', en:null}); commit(); draw(); };
+      const bD=document.createElement('button'); bD.className='sm'; bD.textContent='−'; bD.title='Borrar esta línea';
+      bD.onclick=()=>{ rows.splice(i,1); commit(); draw(); };
+      tdB.append(bA,' ',bD);
+      tr.append(tdN,tdT,tdC,tdX,tdK,tdB); tb.appendChild(tr);
+    });
+  }
+  $('crF').oninput=draw; $('crM').onchange=draw;
+  draw();
+}
+
+/* --- texto plano --- */
+function showText(r, head){
+  const ed=$('ed'); ed.innerHTML='';
+  const box=document.createElement('div'); box.className='box';
+  const crlf = DEC.decode(r.data).includes('\r\n');
+  box.innerHTML=head+'<div class="dim">Texto plano (ANSI, '+kb(r.data.length)+(crlf?', saltos de línea Windows':'')+').</div>';
+  box.appendChild(commonButtons(r));
+  const imp=document.createElement('button'); imp.textContent='Importar .txt…'; imp.title='Lee el .txt editado (ANSI o UTF-8)';
+  imp.onclick=async()=>{ const f=await pickFile('.txt'); if(!f) return;
+    try { r.data=textFromTxt(readTxt(f.bytes), r.orig); updState(); select(SEL); } catch(e){ toast('No se ha importado: '+e.message); } };
+  box.lastChild.appendChild(imp);
+  const ta=document.createElement('textarea'); ta.value=DEC.decode(r.data); ta.spellcheck=false;
+  const msg=document.createElement('div'); msg.className='row';
+  ta.oninput=()=>{ let s=ta.value; if (crlf) s=s.replace(/\r?\n/g,'\r\n'); const b=ansi(s);
+    if (!b){ msg.innerHTML='<span class="err">Caracteres no admitidos (ANSI): '+esc(badChars(s))+'</span>'; return; }
+    msg.textContent=''; r.data=b; updState(); };
+  box.append(ta,msg); ed.appendChild(box);
+}
+
+/* --- datos binarios --- */
+function showBinary(r, head){
+  const ed=$('ed'); ed.innerHTML='';
+  const box=document.createElement('div'); box.className='box';
+  box.innerHTML=head+'<div class="dim">Datos binarios de formato desconocido ('+kb(r.data.length)+'). Puedes exportarlos y volver a importarlos. Si sabes qué contiene, mándamelo y le preparo un editor propio.</div>';
+  box.appendChild(commonButtons(r));
+  const imp=document.createElement('button'); imp.textContent='Importar…';
+  imp.onclick=async()=>{ const f=await pickFile(); if(!f) return; r.data=f.bytes; updState(); select(SEL); };
+  box.lastChild.appendChild(imp);
+  const n=Math.min(r.data.length, 16384); let s='';
+  for (let o=0;o<n;o+=16){ const sl=r.data.subarray(o,Math.min(o+16,n));
+    s+=o.toString(16).padStart(6,'0')+'  '+[...sl].map(x=>x.toString(16).padStart(2,'0')).join(' ').padEnd(48)+'  '+[...sl].map(x=>x>=32&&x<127?String.fromCharCode(x):'.').join('')+'\n'; }
+  if (n<r.data.length) s+='… ('+(r.data.length-n)+' bytes más)\n';
+  const pre=document.createElement('pre'); pre.className='hex'; pre.textContent=s;
+  box.appendChild(pre); ed.appendChild(box);
+}
+
+/* --- imágenes --- */
+let zoom=0, verTransp=true;
+const autoK=(im,box,max)=>Math.max(1,Math.min(max,Math.floor(box/Math.max(im.w,im.h,1))));
+function showImage(r, head){
+  const e=r.e, ed=$('ed'); ed.innerHTML='';
+  const box=document.createElement('div'); box.className='box';
+  const c=curImg(r), g=gameImg(r);
+  if (!c){ box.innerHTML=head+'<div class="err">No se ha podido leer esta imagen en el .rsc.</div>'; ed.appendChild(box); return; }
+  let info = 'Fichero: '+e.w+'×'+e.h+' px · '+(isPal(e)?'8 bits con paleta de '+e.palSize+' colores':'16 bits')
+    +((e.flags&FLAG_KEY)?' · con transparencia (magenta)':' · sin transparencia')+' · punto de referencia '+e.cx+','+e.cy;
+  if (r.img) info += '<br><span style="color:var(--mod)">Cambiada (sin guardar): '+r.img.w+'×'+r.img.h+' px'+(r.img.px.includes(KEY555)?', con magenta':'')+'.</span>';
+  box.innerHTML=head+'<div class="dim">'+info+'</div>';
+  const bar=document.createElement('div'); bar.className='row';
+  const mk=(t,f,ttl)=>{ const b=document.createElement('button'); b.textContent=t; if(ttl) b.title=ttl; b.onclick=f; bar.appendChild(b); return b; };
+  mk('Exportar PNG', async()=>download(e.id+'.png', await pngOf(curImg(r)), 'image/png'), 'Para editarla en Paint/Photoshop. El magenta puro es el transparente.');
+  mk('Importar imagen…', async()=>{ const f=await pickFile('.png,.bmp,.jpg,.jpeg,image/*'); if(!f) return; await importInto(r, f.bytes, f.name, true); });
+  const bD=mk('Descartar cambios', ()=>{ r.img=null; r.vsGame=undefined; updState(); select(SEL); }); bD.disabled=!r.img;
+  const bG=mk('Volver al original del juego', ()=>{ const gi=gameImg(r); r.img = samePx(gi, baseImg(r)) && gi.cx===e.cx && gi.cy===e.cy ? null : gi; r.vsGame=undefined; updState(); select(SEL); });
+  bG.disabled=!g || samePx(g,c);
+  const zs=document.createElement('select'); [0,1,2,3,4,8].forEach(z=>{ const o=document.createElement('option'); o.value=z; o.textContent= z ? 'Zoom '+z+'×' : 'Zoom automático'; zs.appendChild(o); }); zs.value=zoom;
+  zs.onchange=()=>{ zoom=+zs.value; select(SEL); };
+  const tl=document.createElement('label'); tl.innerHTML='<input type="checkbox"> Ver magenta como transparente'; tl.firstChild.checked=verTransp;
+  tl.firstChild.onchange=()=>{ verTransp=tl.firstChild.checked; select(SEL); };
+  botonUso(r, bar);
+  bar.append(zs, tl);
+  box.appendChild(bar);
+  const cmp=document.createElement('div'); cmp.className='cmp';
+  const view=(im,lbl)=>{ const w=document.createElement('div'); w.innerHTML='<div class="lbl">'+lbl+'</div>';
+    const v=document.createElement('div'); v.className='imgview chk'; const cv=imgCanvas(im, verTransp);
+    const k=zoom||autoK(c,360,8); cv.style.width=(im.w*k)+'px'; cv.style.height=(im.h*k)+'px'; v.appendChild(cv); w.appendChild(v); return w; };
+  cmp.appendChild(view(c, r.img ? 'Nueva' : (g && !samePx(g,c) ? 'Actual (distinta del juego)' : 'Actual')));
+  if (g && !samePx(g,c)) cmp.appendChild(view(g, 'Original del juego'));
+  box.appendChild(cmp);
+  box.insertAdjacentHTML('beforeend','<div class="row dim" style="margin-top:10px">Al importar: el magenta puro (R255 G0 B255), o un píxel transparente en un PNG con canal alfa, es el transparente. '
+    +'Si una imagen de 8 bits no cabe en su paleta, o cambia de tamaño, pasa a 16 bits y cambia también el .idx. La posición y la zona de clic de los botones las define el juego, no la imagen.</div>');
+  ed.appendChild(box);
+}
+async function importInto(r, bytes, name, ask){
+  let im; try { im=await readImage(bytes); } catch(e){ toast('No se ha podido leer '+name+' como imagen.'); return false; }
+  if (im.w>65535||im.h>65535||!im.w||!im.h){ toast(name+': tamaño no válido.'); return false; }
+  const base=baseImg(r);
+  if (ask && (im.w!==base.w || im.h!==base.h) && !confirm(name+' mide '+im.w+'×'+im.h+' y la imagen actual '+base.w+'×'+base.h+'.\n\nCambiar el tamaño obliga a instalar también el .idx, y el juego seguirá colocando el botón en el mismo sitio. ¿Continuar?')) return false;
+  setImg(r, im); updState(); if (ask) select(SEL);
+  return true;
+}
+async function exportAll(){
+  const imgs=CUR.res.filter(r=>r.e.type===100); const files=[];
+  $('status').textContent='Preparando '+imgs.length+' PNG…';
+  for (const r of imgs){ const c=curImg(r); if (c) files.push({name:r.e.id+'.png', bytes:await pngOf(c)}); }
+  download(CUR.f.n+'_imagenes.zip', makeZip(files), 'application/zip'); updState();
+}
+function importMany(){
+  const i=document.createElement('input'); i.type='file'; i.multiple=true; i.accept='.png,.bmp,.jpg,.jpeg,image/*';
+  i.onchange=async()=>{
+    const map=new Map(CUR.res.filter(r=>r.e.type===100).map(r=>[r.e.id.toUpperCase(), r]));
+    let ok=0, igual=0; const sin=[], malos=[], tam=[];
+    for (const f of i.files){
+      const r=map.get(f.name.replace(/\.[^.]+$/,'').toUpperCase()); if (!r){ sin.push(f.name); continue; }
+      const had=!!r.img;
+      const okk=await importInto(r, new Uint8Array(await f.arrayBuffer()), f.name, false);
+      if (!okk){ malos.push(f.name); continue; }
+      if (r.img){ ok++; const b=baseImg(r); if (r.img.w!==b.w||r.img.h!==b.h) tam.push(f.name+' ('+r.img.w+'×'+r.img.h+')'); } else if (!had) igual++;
+    }
+    updState(); if (SEL!=null) select(SEL);
+    toast(ok+' imagen(es) cambiadas, '+igual+' sin cambios.'
+      +(tam.length?'\nCon tamaño distinto: '+tam.join(', '):'')
+      +(sin.length?'\nSin recurso con ese nombre: '+sin.join(', '):'')
+      +(malos.length?'\nNo se han podido leer: '+malos.join(', '):''), 9000);
+  };
+  i.click();
+}
+function showGallery(){
+  if (!CUR) return; SEL=null; renderList();
+  const ed=$('ed'); ed.innerHTML='';
+  const imgs=CUR.res.map((r,i)=>[r,i]).filter(([r])=>r.e.type===100);
+  const fn=$('fNombre').value.trim().toLowerCase();
+  const box=document.createElement('div'); box.className='box';
+  box.innerHTML='<h2>Galería <span class="dim" style="font-weight:400">· '+imgs.length+' imágenes'+(fn?' (filtradas por «'+esc(fn)+'»)':'')+'</span></h2><div class="dim">Haz clic en una imagen para abrirla. ✎ = cambiada sin guardar · ● = distinta del original del juego.</div>';
+  ed.appendChild(box);
+  const g=document.createElement('div'); g.className='gal'; ed.appendChild(g);
+  const io=new IntersectionObserver(ents=>ents.forEach(en=>{ if(!en.isIntersecting) return; io.unobserve(en.target);
+    const r=CUR.res[+en.target.dataset.i], c=curImg(r); if (c){ const cv=imgCanvas(c,true), k=autoK(c,96,8); cv.style.width=(c.w*k)+'px'; cv.style.height=(c.h*k)+'px'; en.target.querySelector('.th').appendChild(cv); } }), {root:ed, rootMargin:'300px'});
+  imgs.forEach(([r,i])=>{
+    if (fn && !r.e.id.toLowerCase().includes(fn)) return;
+    const d=document.createElement('div'); d.className='it'+(changed(r)?' mod':''); d.dataset.i=i;
+    const ci=r.img||r.e;
+    d.innerHTML='<div class="th chk"></div><div class="nm" title="'+esc(r.e.id)+'">'+(changed(r)?'✎ ':(vsGame(r)?'● ':''))+esc(r.e.id)+'</div><div class="sz">'+ci.w+'×'+ci.h+'</div>';
+    d.onclick=()=>select(i); g.appendChild(d); io.observe(d);
+  });
+}
+
+/* --- sonidos --- */
+function wavExtra(b){ const w=parseWav(b,0); return w.ok ? {channels:w.channels, headerSize:w.dataOff} : null; }
+function showSound(r, head){
+  const e=r.e, ed=$('ed'); ed.innerHTML='';
+  const w=parseWav(r.data,0), w0=parseWav(r.orig,0);
+  const box=document.createElement('div'); box.className='box';
+  const fmtTxt = w.ok ? (w.channels===1?'mono':w.channels+' canales')+' · '+w.rate+' Hz · '+w.bits+' bits'+(w.fmt!==1?' · formato '+w.fmt:'')+' · '+(w.dataLen/(w.rate*w.channels*w.bits/8)).toFixed(2)+' s' : '';
+  // el campo "headersize" del .idx coincide con el tamaño de la cabecera WAV?
+  const hyp = w0.ok && w0.dataOff===e.headerSize;
+  box.innerHTML=head+'<div class="dim">'+esc(fmtTxt)+' · '+kb(r.data.length)+'</div>';
+  const au=document.createElement('audio'); au.controls=true; audioUrl=URL.createObjectURL(new Blob([r.data],{type:'audio/wav'})); au.src=audioUrl;
+  const rowA=document.createElement('div'); rowA.className='row'; rowA.appendChild(au); box.appendChild(rowA);
+  box.appendChild(commonButtons(r));
+  const imp=document.createElement('button'); imp.textContent='Sustituir por .wav…';
+  imp.disabled=!hyp;
+  if (!hyp) imp.title='El formato de este sonido en el .rsc no es el esperado; mándame el .rsc para revisarlo';
+  imp.onclick=async()=>{
+    const f=await pickFile('.wav,audio/wav'); if(!f) return;
+    const nw=parseWav(f.bytes,0);
+    if (!nw.ok || nw.dataOff===undefined){ toast('Ese fichero no es un WAV válido.'); return; }
+    const avisos=[];
+    if (nw.fmt!==w0.fmt) avisos.push('formato '+nw.fmt+' (el original es '+w0.fmt+')');
+    if (nw.rate!==w0.rate) avisos.push(nw.rate+' Hz (el original es '+w0.rate+' Hz)');
+    if (nw.bits!==w0.bits) avisos.push(nw.bits+' bits (el original es '+w0.bits+')');
+    if (nw.channels!==w0.channels) avisos.push(nw.channels+' canales (el original tiene '+w0.channels+')');
+    if (avisos.length && !confirm('El WAV nuevo no tiene el mismo formato que el original:\n- '+avisos.join('\n- ')+'\n\nEl juego podría reproducirlo mal. ¿Usarlo igualmente?')) return;
+    r.data=f.bytes.slice(0,nw.len); r.extra={channels:nw.channels, headerSize:nw.dataOff}; updState(); select(SEL);
+  };
+  box.lastChild.appendChild(imp);
+  if (!hyp) box.insertAdjacentHTML('beforeend','<div class="row err">No reconozco del todo cómo guarda este .rsc el sonido, así que la sustitución está desactivada. Se puede escuchar y exportar.</div>');
+  ed.appendChild(box);
+}
+
+/* ---------------- guardar ---------------- */
+const enc16=px=>{ const o=new Uint8Array(px.length*2); for (let i=0;i<px.length;i++){ o[i*2]=px[i]&255; o[i*2+1]=px[i]>>8; } return o; };
+// Reescribe una imagen de 8 bits en su sitio con una paleta nueva; null si los colores no caben
+function encodePalInPlace(px, rsc, im){
+  const n=im.palSize, oldPal=[]; for (let i=0;i<n;i++) oldPal.push(u16(rsc,8+im.palOff+i*2));
+  const colors=new Set(px); let needed=0; for (const c of colors) if (c!==oldPal[0]) needed++;
+  if (needed>n-1) return null;
+  const newPal=new Array(n).fill(0), used=new Array(n).fill(false), where=new Map();
+  newPal[0]=oldPal[0]; used[0]=true; where.set(oldPal[0],0);
+  for (let i=1;i<n;i++) if (colors.has(oldPal[i]) && !where.has(oldPal[i])){ newPal[i]=oldPal[i]; used[i]=true; where.set(oldPal[i],i); }
+  let slot=1; for (const c of colors){ if (where.has(c)) continue; while (used[slot]) slot++; newPal[slot]=c; used[slot]=true; where.set(c,slot); }
+  for (let i=0;i<n;i++) if (!used[i]) newPal[i]=oldPal[i];
+  for (let i=0;i<n;i++) w16(rsc,8+im.palOff+i*2,newPal[i]);
+  const out=new Uint8Array(px.length); for (let i=0;i<px.length;i++) out[i]=where.get(px[i]); return out;
+}
+function build(){
+  const idx=CUR.idx.slice();
+  let rsc=CUR.rsc.slice(), len=rsc.length;
+  const grow=(need)=>{ if (need<=rsc.length) return; const n=new Uint8Array(Math.max(need, rsc.length*1.5|0)); n.set(rsc.subarray(0,len)); rsc=n; };
+  let movidos=0;
+  let pal16=0;
+  // paletas usadas por más de una imagen: no se reescriben en su sitio
+  const palUso={}; CUR.res.forEach(r=>{ if (r.e.type===100 && isPal(r.e)) palUso[r.e.palOff]=(palUso[r.e.palOff]||0)+1; });
+  for (const r of CUR.res){
+    if (r.e.type!==100 || !r.img) continue;
+    const im=Object.assign({}, r.e), p=im.pos, px=r.img.px, w=r.img.w, h=r.img.h;
+    const hasKey=px.includes(KEY555), sameSize= w===im.w && h===im.h;
+    let enc=null;
+    let palOk = sameSize && isPal(im) && palUso[im.palOff]===1;
+    if (palOk && hasKey) palOk = (im.flags&FLAG_KEY)!==0 && u16(rsc,8+im.palOff)===KEY555;
+    if (palOk) enc=encodePalInPlace(px, rsc, im);
+    if (sameSize && enc){ rsc.set(enc, 8+im.off); }
+    else if (sameSize && !isPal(im)){ rsc.set(enc16(px), 8+im.off); }
+    else {
+      const b16=enc16(px); let at=(len+3)&~3; grow(at+b16.length); rsc.fill(0,len,at); rsc.set(b16,at); len=at+b16.length;
+      if (!sameSize){ if (Math.abs(im.cx*2-im.w)<=1) im.cx=w>>1; if (Math.abs(im.cy*2-im.h)<=1) im.cy=h>>1; }
+      im.w=w; im.h=h; im.off=at-8; im.palSize=0; im.palOff=0; im.flags=((im.flags&~(FLAG_PAL|FLAG_16))|FLAG_16)>>>0; movidos++; pal16++;
+    }
+    if (r.img.cx!==undefined){ im.cx=r.img.cx; im.cy=r.img.cy; }
+    if (hasKey && !(im.flags&FLAG_KEY)) im.flags=(im.flags|FLAG_KEY)>>>0;
+    w32(idx,p+36,im.flags); w16(idx,p+40,im.cx); w16(idx,p+42,im.cy); w16(idx,p+44,im.w); w16(idx,p+46,im.h);
+    w32(idx,p+48,im.off); w32(idx,p+52,im.palSize); w32(idx,p+56,im.palOff);
+  }
+  for (const r of CUR.res){
+    if (!r.data || eqBytes(r.data, r.orig)) continue;
+    const e=r.e, p=e.pos;
+    let base=8, off=e.off;
+    if (e.type===101){ const s=soundBytes(CUR.rsc,e); base=s?s.base:8; }
+    if (r.data.length===r.orig.length){
+      rsc.set(r.data, base+off);
+    } else {
+      // no cabe en su sitio: al final del .rsc (alineado a 4) y se actualiza el .idx
+      let at=(len+3)&~3; grow(at+r.data.length); rsc.fill(0,len,at); rsc.set(r.data, at); len=at+r.data.length;
+      off=at-base; movidos++;
+    }
+    if (e.type===102){ w32(idx,p+36,off); w32(idx,p+40,r.data.length); }
+    if (e.type===101){ w32(idx,p+44,off); if (r.extra){ w16(idx,p+40,r.extra.channels); w32(idx,p+48,r.extra.headerSize); } }
+  }
+  rsc=rsc.slice(0,len); w32(rsc,0,len-8);
+  return {idx, rsc, movidos};
+}
+async function save(){
+  if (!CUR) return;
+  let b; try { b=build(); } catch(e){ toast('No se puede guardar: '+e.message); return; }
+  // comprobación: se vuelve a leer lo construido
+  try {
+    const p2=parseIdx(b.idx);
+    for (let i=0;i<CUR.res.length;i++){ const r=CUR.res[i], e2=p2.ents[i];
+      if (r.e.type===100){ const want=curImg(r); const px=px555(b.rsc,e2);
+        if (!want || !px || e2.w!==want.w || e2.h!==want.h || !eqBytes(px,want.px)) throw new Error(r.e.id); continue; }
+      if (!r.data) continue;
+      const got=resBytes(b.rsc, e2); if (!eqBytes(got, r.data)) throw new Error(r.e.id); }
+    // las imágenes no tocadas siguen igual
+    for (let i=0;i<CUR.res.length;i++){ const r=CUR.res[i]; if (r.e.type!==100 || r.img) continue;
+      if (!eqBytes(px555(b.rsc,p2.ents[i]), px555(CUR.rsc,r.e))) throw new Error(r.e.id+' (no tocada)'); }
+  } catch(e){ toast('Error interno al comprobar el fichero ('+e.message+'). No se ha guardado nada.'); return; }
+  const body=new Uint8Array(4+b.idx.length+b.rsc.length); w32(body,0,b.idx.length); body.set(b.idx,4); body.set(b.rsc,4+b.idx.length);
+  const r=await fetch(api('save',{idx:CUR.f.idx, rsc:CUR.f.rsc}),{method:'POST', body});
+  const j=r.ok ? await r.json() : {ok:false, error:'HTTP '+r.status};
+  if (!j.ok){ toast('No se ha guardado: '+j.error); return; }
+  const gIdx=await getBytes(CUR.f.idx,'juego');
+  const idxCambia=!eqBytes(b.idx, gIdx);
+  CUR.idx=b.idx; CUR.rsc=b.rsc; CUR.base='editado'; CUR.p=parseIdx(b.idx);
+  CUR.res.forEach((r,i)=>{ r.e=CUR.p.ents[i]; if (r.data) r.orig=r.data; if (r.e.type===100){ r.base0=r.img||null; r.img=null; r.vsGame=undefined; } });
+  CUR.f.ed=true;
+  const og=[...$('selFile').options].find(o=>o.value===String(CUR.fi)); if (og && !og.textContent.startsWith('● ')) og.textContent='● '+og.textContent;
+  updState(); select(SEL);
+  const ret=[].concat(j.retirables||[]);
+  toast((j.editados && [].concat(j.editados).length ? 'Guardado en:\n'+[].concat(j.editados).join('\n') : 'Sin cambios respecto al original: no se ha copiado nada al instalador.')
+    +(j.idxIgual && !ret.length && [].concat(j.editados||[]).length ? '\n\nEl .idx es igual al original: no se copia al instalador (solo el .rsc).' : '')
+    +(ret.length ? '\n\nYa son iguales al original y se pueden retirar del instalador (fichero y línea de Archivos.csv):\n'+ret.join('\n') : '')
+    +(j.originales && [].concat(j.originales).length ? '\n\nOriginal copiado a:\n'+[].concat(j.originales).join('\n') : '')
+    +([].concat(j.csv||[]).includes('añadida') ? '\n\nArchivos.csv: línea(s) añadida(s) para instalar y restaurar.' : '')
+    +(idxCambia ? '\n\nEl .idx HA CAMBIADO: va al instalador junto con el .rsc.' : ''), 9000);
+  // el editor SCF recarga las imágenes de este .rsc
+  if (window.parent!==window) window.parent.postMessage({tipo:'rscGuardado', teatro:$('selTh').value, rsc:CUR.f.rsc}, location.origin);
+}
+
+/* ---------------- eventos ---------------- */
+$('selTh').onchange=async()=>{ if (dirty() && !confirm('Hay cambios sin guardar. ¿Descartarlos?')){ return; } CUR=null; SEL=null; renderList(); $('ed').innerHTML=''; updState(); await loadList(); };
+$('selFile').onchange=()=>openFile($('selFile').value);
+$('bRefresh').onclick=()=>loadList(true);
+$('bSave').onclick=save;
+$('bExpTxt').onclick=exportTexts; $('bImpTxt').onclick=importTexts;
+$('bGal').onclick=showGallery; $('bExpAll').onclick=exportAll; $('bImpMany').onclick=importMany;
+$('fNombre').oninput=renderList; $('fTipo').onchange=renderList;
+document.addEventListener('keydown', ev=>{ if ((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==='s'){ ev.preventDefault(); if (!$('bSave').disabled) save(); } });
+window.addEventListener('beforeunload', ev=>{ if (dirty()){ ev.preventDefault(); ev.returnValue=''; } });
+init();
+</script>
+</body>
+</html>

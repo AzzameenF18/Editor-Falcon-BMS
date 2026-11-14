@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<script src="/i18n.js"></script>
+<title>Ajuste de voces — Falcon BMS</title>
+<style>
+:root{--bg:#14191F;--pan:#1A2129;--pan2:#212A34;--line:#2E3A47;--txt:#DCE3EA;--dim:#8A98A8;--acc:#E0A13A;--ok:#5BB974;--err:#E5615A;--mod:#E0A13A}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:13px/1.4 "Segoe UI",system-ui,sans-serif}
+body{display:flex;flex-direction:column}
+header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:var(--pan);border-bottom:1px solid var(--line)}
+header h1{font-size:14px;margin:0 8px 0 0;font-weight:600;color:var(--acc)}
+select,input,button{font:inherit;color:var(--txt);background:var(--pan2);border:1px solid var(--line);border-radius:5px}
+select,input[type=text],input[type=number]{padding:4px 6px}
+button{padding:4px 10px;cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled){border-color:var(--acc)}
+button:disabled{opacity:.45;cursor:default}
+button.pri{background:var(--acc);color:#14191F;border-color:var(--acc);font-weight:600}
+button.sm{padding:2px 8px;font-size:12px}
+button.sonando{border-color:var(--acc)!important;color:var(--acc)}
+.sp{flex:1}
+.dim{color:var(--dim)} .ok{color:var(--ok)} .err{color:var(--err)}
+#srv{display:flex;gap:8px;align-items:center}
+#srv .luz{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block}
+#srv .luz.on{background:var(--ok)} #srv .luz.carga{background:var(--acc);animation:p 1.2s infinite}
+@keyframes p{50%{opacity:.25}}
+#nota{padding:6px 12px;font-size:12px;color:var(--dim);border-bottom:1px solid var(--line)}
+#rejilla{flex:1;overflow:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;align-content:start}
+.voz{background:var(--pan);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.voz.mod{border-color:var(--mod)}
+.voz h2{font-size:14px;margin:0 0 6px;display:flex;gap:8px;align-items:center}
+.voz h2 .f{font-size:11px;color:#e3a6c8}
+.voz h2 .est{font-size:11px;font-weight:400;padding:1px 6px;border-radius:3px;background:#2E3A47;color:var(--dim)}
+.voz h2 .est.propio{background:#3b3315;color:var(--acc)}
+.voz .r{display:grid;grid-template-columns:92px 1fr 52px;gap:8px;align-items:center;margin:3px 0}
+.voz .r input[type=range]{width:100%;accent-color:var(--acc)}
+.voz .r output{font:12px Consolas,monospace;text-align:right}
+.voz .r select{width:100%}
+.voz .txt{width:100%;margin:6px 0}
+.voz .bts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.voz .msg{font-size:11px;color:var(--dim);min-height:15px;margin-top:4px}
+.voz .refp{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.voz .refl{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:5px;margin:4px 0}
+.voz .refl label{display:flex;gap:6px;align-items:center;padding:2px 6px;border-bottom:1px solid #1f2730;font-size:12px;cursor:pointer}
+.voz .refl label.us{background:#202a1f}
+.voz .refl .d{font:11px Consolas,monospace;color:var(--dim);min-width:34px;text-align:right}
+.voz .refl .s{font:11px Consolas,monospace;min-width:44px;text-align:right}
+.voz .refl .s.mal{color:var(--err)}
+.voz .refl .e{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.voz .sec{font-size:11px;color:var(--acc);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.04em}
+#toast{position:fixed;right:16px;bottom:16px;background:var(--pan2);border:1px solid var(--line);border-left:4px solid var(--acc);padding:10px 14px;border-radius:6px;max-width:560px;box-shadow:0 4px 16px #0008;white-space:pre-line;display:none;z-index:5}
+#toast.err{border-left-color:var(--err)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Ajuste de voces</h1>
+  <span id="srv"><span class="luz" id="luz"></span><span id="srvTxt">Servidor de pruebas: parado</span><button class="sm" id="bSrv">Arrancar</button></span>
+  <span class="sp"></span>
+  <button id="bLimpiarTodas" title="Quita el ruido de fondo y repara la saturación de las referencias de las 14 voces (la versión sin limpiar se guarda)">Limpiar las 14 referencias</button>
+  <button id="bRefiltrar" title="Vuelve a aplicar efecto de radio y volumen (generales o de cada voz) a todo lo generado; sin GPU, rápido">Aplicar efecto y volumen a lo generado</button>
+</header>
+<div id="nota">Ajusta cada voz y pulsa <b>▶ Probar</b> (la primera prueba de cada voz tarda algo más). Cuando suene bien, <b>Guardar para esta voz</b>: la generación usará esos ajustes en vez de los generales (⚙ de la pestaña Voces).
+Efecto y volumen se aplican a lo ya generado con el botón de arriba; los ajustes de la voz (los del motor: Chatterbox o XTTS, ⚙ de la pestaña Voces) solo a lo que se genere después (o con <b>Regenerar esta voz</b>).</div>
+<div id="rejilla"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+const K = new URLSearchParams(location.search).get('k') || '';
+const api = (p, q) => 'api/' + p + '?' + new URLSearchParams(Object.assign({k: K}, q || {}));
+const $ = id => document.getElementById(id);
+const NUM = ['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece'];
+const FEM = [4, 6, 12];
+let INFO = null, AJ = {}, GENERALES = {}, SRV = {enMarcha:false}, LISTO = false, ORIG = {}, AUDIO = null, BOTON = null, ULT = {};
+
+function toast(t, err){ const e=$('toast'); e.textContent=t; e.classList.toggle('err', !!err); e.style.display='block'; clearTimeout(toast.h); toast.h=setTimeout(()=>e.style.display='none', err?9000:5000); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function post(p, obj){
+  const r = await fetch(api(p), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(obj||{})});
+  try { return await r.json(); } catch(e){ return {ok:false, error:'respuesta no válida ('+r.status+')'}; }
+}
+function csv(texto){
+  const filas=[]; let f=[], c='', q=false;
+  for (let i=0;i<texto.length;i++){
+    const ch=texto[i];
+    if (q){ if (ch==='"'){ if (texto[i+1]==='"'){ c+='"'; i++; } else q=false; } else c+=ch; }
+    else if (ch==='"') q=true; else if (ch===';'){ f.push(c); c=''; }
+    else if (ch==='\n'){ f.push(c.replace(/\r$/,'')); filas.push(f); f=[]; c=''; } else c+=ch;
+  }
+  if (c || f.length){ f.push(c); filas.push(f); }
+  return filas;
+}
+const vv = v => String(v).padStart(2,'0');
+// frase de prueba del idioma de la traducción (Ajustes del idioma); el número lo lee el servidor en ese idioma
+const textoDefecto = v => `${(INFO && INFO.frasePrueba) || 'Esto es una prueba de audio para la voz número'} ${v}.`;
+// la frase guardada para una voz solo vale para el idioma en que se escribió (el español, de momento)
+const textoGuardado = v => (!INFO || !INFO.codigo || INFO.codigo === 'ES') && AJ[vv(v)] && AJ[vv(v)].texto;
+
+// ajustes del motor elegido (Chatterbox o XTTS) + los de sonido, que son comunes
+const MOT = () => (INFO && INFO.motor === 'xtts') ? ['temperatura','velocidad'] : ['cbTemperatura','expresividad','cfg'];
+const CLAVES = () => [...MOT(), 'rms','radio','suavizado','limpieza','pausaInicio','pausaFin'];
+function valores(v){
+  const c = document.querySelector(`.voz[data-v="${v}"]`);
+  const o = { texto:c.querySelector('.txt').value.trim() };
+  for (const k of CLAVES()) o[k] = +c.querySelector(`[data-k=${k}]`).value;
+  return o;
+}
+const DEF = {temperatura:0.65, velocidad:1, cbTemperatura:0.8, expresividad:0.5, cfg:0.5, rms:6000, radio:1, suavizado:0, limpieza:0, pausaInicio:25, pausaFin:15};
+function base(v){ const a = Object.assign({}, AJ[vv(v)] || {}); if (!textoGuardado(v)) delete a.texto; return Object.assign({texto:textoDefecto(v)}, DEF, GENERALES, a); }
+function marcar(v){
+  const c = document.querySelector(`.voz[data-v="${v}"]`), b = base(v), x = valores(v);
+  const mod = CLAVES().some(k => Math.abs((+b[k]) - x[k]) > 1e-6);
+  c.classList.toggle('mod', mod);
+  c.querySelector('.est').textContent = (AJ[vv(v)] ? 'ajustes propios' : 'usa los generales') + (mod ? ' · sin guardar' : '');
+  c.querySelector('.est').classList.toggle('propio', !!AJ[vv(v)]);
+  c.querySelector('.bDel').disabled = !AJ[vv(v)];
+}
+function pintar(){
+  const r = $('rejilla');
+  r.innerHTML = Array.from({length:14}, (_, v) => {
+    const b = base(v);
+    const fila = (k, et, min, max, paso, tip) => `<div class="r" title="${tip}"><span>${et}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${paso}" value="${b[k]}"><output>${b[k]}</output></div>`;
+    return `<div class="voz" data-v="${v}">
+      <h2>Voz ${vv(v)} ${FEM.includes(v)?'<span class="f">(F)</span>':''}<span class="est"></span></h2>
+      ${INFO && INFO.motor === 'xtts' ? `<div class="sec">Voz (XTTS)</div>
+      ${fila('temperatura','Temperatura',0.1,1,0.05,'Más bajo = más estable y plano; más alto = más expresivo pero con más fallos')}
+      ${fila('velocidad','Velocidad',0.8,1.3,0.05,'1.0 = natural; otros valores pueden ensuciar la voz')}` : `<div class="sec">Voz (Chatterbox)</div>
+      ${fila('cbTemperatura','Temperatura',0.05,1.5,0.05,'Más bajo = más estable; más alto = más variado (0,8 por defecto)')}
+      ${fila('expresividad','Expresividad',0.25,2,0.05,'Intensidad de la entonación (0,5 = normal). Más alto = más intenso y algo más rápido')}
+      ${fila('cfg','Ritmo (cfg)',0,1,0.05,'Fidelidad al texto y a la voz (0,5 por defecto). Más bajo = ritmo más pausado')}`}
+      <div class="sec">Sonido (se puede cambiar sin regenerar)</div>
+      ${fila('suavizado','Suavizado',0,1,0.05,'Quita agudos ásperos (carraspera): 0 = nada, 1 = máximo')}
+      ${fila('limpieza','Limpieza',0,1,0.05,'Quita ruido y grano de la voz: 0 = nada, 1 = máximo (demasiado suena metálico)')}
+      ${fila('rms','Volumen',1000,12000,250,'Volumen final (los originales rondan 7000)')}
+      <div class="r"><span>Efecto radio</span><select data-k="radio"><option value="0">0 · limpio</option><option value="1">1 · suave</option><option value="2">2 · fuerte</option></select><span></span></div>
+      ${fila('pausaInicio','Silencio antes',0,500,5,'Milisegundos de silencio antes de cada fragmento')}
+      ${fila('pausaFin','Silencio después',0,1000,5,'Milisegundos de silencio después de cada fragmento')}
+      <input class="txt" type="text" value="${esc(textoGuardado(v) || textoDefecto(v))}" title="Frase de prueba">
+      <div class="bts">
+        <button class="sm pri bProbar" title="Sintetiza la frase con estos ajustes">▶ Probar</button>
+        <button class="sm bCrudo" title="La misma frase sin filtro de radio (salida del modelo)">▶ Sin filtro</button>
+        <button class="sm bOrig" title="Un clip original en inglés de esta voz, al azar">▶ Original</button>
+        <span class="sp"></span>
+        <button class="sm bSave" title="Guardar estos ajustes para esta voz">Guardar para esta voz</button>
+        <button class="sm bDel" title="Quitar los ajustes propios y usar los generales">Usar generales</button>
+        <button class="sm bGen" title="Vuelve a generar todos los clips de esta voz (4 teatros) con sus ajustes">Regenerar esta voz</button>
+        <button class="sm bRef" title="Elegir las frases originales con las que se clona esta voz">Referencia…</button>
+      </div>
+      <div class="msg"></div>
+      <div class="refp" style="display:none"></div>
+    </div>`;
+  }).join('');
+  for (let v=0; v<14; v++){ const c = document.querySelector(`.voz[data-v="${v}"]`); c.querySelector('[data-k=radio]').value = String(Math.round(base(v).radio)); marcar(v); }
+  botonesSrv();
+}
+
+// ---------- servidor de pruebas ----------
+const srvUrl = (p) => `http://127.0.0.1:${SRV.puerto}/${p}?k=${SRV.token}`;
+function botonesSrv(){
+  document.querySelectorAll('.bProbar,.bCrudo').forEach(b => b.disabled = !LISTO);
+  $('bSrv').style.display = SRV.enMarcha ? 'none' : '';
+}
+async function estadoSrv(){
+  try { SRV = await (await fetch(api('servidor'))).json(); } catch(e){ SRV = {enMarcha:false}; }
+  // se ha cambiado de motor en la pestaña Voces: se vuelve a pintar con sus ajustes
+  if (INFO && SRV.motor && (SRV.motor !== INFO.motor || SRV.variante !== INFO.variante)){
+    try { INFO = await (await fetch(api('info'))).json(); pintar(); } catch(e){}
+  }
+  if (!SRV.enMarcha){ LISTO = false; $('luz').className = 'luz'; $('srvTxt').textContent = 'Servidor de pruebas: parado'; botonesSrv(); return; }
+  try {
+    const e = await (await fetch(srvUrl('estado'))).json();
+    LISTO = !!e.listo;
+    $('luz').className = 'luz ' + (e.listo ? 'on' : (e.error ? '' : 'carga'));
+    $('srvTxt').innerHTML = e.listo ? `Servidor de pruebas: listo <span class="dim" data-noi18n>(${esc((e.motor ? e.motor + " · " : "") + e.dispositivo)})</span>` :
+      (e.error ? `<span class="err">Error: ${esc(e.error)}</span>` : `Servidor de pruebas: ${esc(e.fase)}…`);
+  } catch(e){ LISTO = false; $('luz').className = 'luz carga'; $('srvTxt').textContent = 'Servidor de pruebas: arrancando…'; }
+  botonesSrv();
+}
+$('bSrv').onclick = async () => {
+  if (!INFO.okXtts){ toast('Falta preparar el entorno (pestaña Voces → «Preparar entorno…»).', true); return; }
+  const r = await fetch(api('servidor'), {method:'POST'}); const j = await r.json();
+  if (j.ok === false){ toast(j.error || 'No se pudo arrancar', true); return; }
+  toast('Arrancando el servidor de pruebas (se abre minimizado). La primera vez tarda en cargar el modelo.'); estadoSrv();
+};
+setInterval(estadoSrv, 3000);
+
+// ---------- audio ----------
+function parar(){ if (AUDIO){ AUDIO.pause(); AUDIO=null; } if (BOTON){ BOTON.classList.remove('sonando'); BOTON=null; } }
+function sonar(btn, url){ parar(); BOTON = btn; btn.classList.add('sonando'); AUDIO = new Audio(url); AUDIO.onended = parar; AUDIO.onerror = () => { parar(); toast('No se pudo reproducir.', true); }; AUDIO.play().catch(()=>{}); }
+async function probar(v, btn, sinFiltro){
+  if (BOTON === btn){ parar(); return; }
+  const c = document.querySelector(`.voz[data-v="${v}"]`), x = valores(v), msg = c.querySelector('.msg');
+  if (!x.texto){ toast('Escribe una frase de prueba.', true); return; }
+  const clave = JSON.stringify([x, !!sinFiltro]);
+  if (ULT[v] && ULT[v].clave === clave){ sonar(btn, ULT[v].url); return; }
+  btn.disabled = true; msg.textContent = 'Generando…'; const t0 = Date.now();
+  try {
+    const r = await fetch(srvUrl('probar'), {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(Object.assign({voz:v, sin_filtro:!!sinFiltro, idioma:INFO.idiomaVoz || 'es', lectura:INFO.lectura || '', dic:INFO.dic || ''}, x))});
+    if (!r.ok){ let e=''; try { e = (await r.json()).error; } catch(_){} throw new Error(e || r.status); }
+    const url = URL.createObjectURL(await r.blob());
+    if (ULT[v]) URL.revokeObjectURL(ULT[v].url);
+    ULT[v] = {clave, url};
+    msg.textContent = `Generado en ${((Date.now()-t0)/1000).toFixed(1)} s`;
+    sonar(btn, url);
+  } catch(e){ msg.innerHTML = '<span class="err">Error: ' + esc(e.message) + '</span>'; }
+  btn.disabled = !LISTO;
+}
+function original(v, btn){
+  if (BOTON === btn){ parar(); return; }
+  const l = ORIG[v] || []; if (!l.length){ toast('No hay clips originales de esta voz en la lista de Corea.', true); return; }
+  const f = l[Math.floor(Math.random()*l.length)];
+  document.querySelector(`.voz[data-v="${v}"] .msg`).textContent = 'Original: «' + f.en + '»';
+  sonar(btn, api('audio', {t:'Corea', id:f.id, src:'en'}));
+}
+
+// ---------- eventos ----------
+$('rejilla').addEventListener('input', ev => {
+  const c = ev.target.closest('.voz'); if (!c) return;
+  if (ev.target.type === 'range') ev.target.nextElementSibling.textContent = ev.target.value;
+  marcar(+c.dataset.v);
+});
+$('rejilla').addEventListener('change', ev => { const c = ev.target.closest('.voz'); if (c) marcar(+c.dataset.v); });
+$('rejilla').addEventListener('click', async ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  const v = +b.closest('.voz').dataset.v;
+  if (b.classList.contains('bProbar')) probar(v, b, false);
+  if (b.classList.contains('bCrudo')) probar(v, b, true);
+  if (b.classList.contains('bOrig')) original(v, b);
+  if (b.classList.contains('bRef')) abrirRef(v);
+  if (b.classList.contains('rp')){ ev.preventDefault(); if (BOTON === b) parar(); else sonar(b, api('audio', {t:'Corea', id:b.dataset.id, src:'en'})); }
+  if (b.classList.contains('rCrear')){
+    const ids = [...b.closest('.refp').querySelectorAll('.refl input:checked')].map(i => +i.value);
+    if (!ids.length){ toast('Marca alguna frase.', true); return; }
+    crearRef(v, {ids, limpiar: LIMPIAR(b)});
+  }
+  if (b.classList.contains('rAuto')) crearRef(v, {auto:true, limpiar: LIMPIAR(b)});
+  if (b.classList.contains('rLimp')) limpiarRef(v, false);
+  if (b.classList.contains('rQuitar')) limpiarRef(v, true);
+  if (b.classList.contains('rIni')){ if (confirm('¿Volver a la referencia que venía de serie?')) crearRef(v, {inicial:true}); }
+  if (b.classList.contains('bSave')){
+    const x = valores(v), j = await post('ajustes-voces', {voz:v, ajustes:x});
+    if (!j.ok){ toast(j.error||'Error', true); return; }
+    AJ = j.voces || {}; marcar(v);
+    toast(`Ajustes de la voz ${vv(v)} guardados.\nEfecto y volumen: «Aplicar efecto y volumen a lo generado».\nAjustes de la voz: «Regenerar esta voz» (o lo que se genere a partir de ahora).`);
+  }
+  if (b.classList.contains('bDel')){
+    if (!confirm(`¿Quitar los ajustes propios de la voz ${vv(v)} y usar los generales?`)) return;
+    const j = await post('ajustes-voces', {voz:v, ajustes:null}); AJ = j.voces || {}; pintar();
+  }
+  if (b.classList.contains('bGen')){
+    if (b.closest('.voz').classList.contains('mod')){ toast('Guarda primero los ajustes de esta voz.', true); return; }
+    if (!confirm(`Volver a generar TODOS los clips de la voz ${vv(v)} (4 teatros) con sus ajustes?\nSe abrirá una consola; puede tardar bastante.`)) return;
+    const j = await post('generar', {t:'todos', rehacerVoz:v});
+    toast(j.ok ? 'Se ha abierto la consola con la regeneración.' : (j.error||'Error'), !j.ok);
+  }
+});
+// ---------- referencia de cada voz ----------
+const LIMPIAR = b => { const x = b.closest('.refp').querySelector('.rLimpiar'); return !x || x.checked; };
+async function abrirRef(v){
+  const c = document.querySelector(`.voz[data-v="${v}"]`), p = c.querySelector('.refp');
+  if (p.style.display !== 'none'){ p.style.display = 'none'; return; }
+  p.style.display = ''; p.innerHTML = '<span class="dim">Leyendo frases originales de la voz…</span>';
+  const j = await (await fetch(api('ref-candidatos', {voz:v}))).json().catch(e => ({ok:false, error:e.message}));
+  if (!j.ok){ p.innerHTML = '<span class="err">' + esc(j.error||'Error') + '</span>'; return; }
+  const l = j.candidatos || [];
+  p.innerHTML = `<div class="dim" style="font-size:12px">La voz se clona de estas frases originales. Escúchalas y marca las más limpias (sin carraspera ni saturación); lo ideal son 15-30 s. <b>Sat</b> = % de muestras saturadas (en rojo, mejor evitarlas).</div>
+    <div class="refl">${l.map(x => `<label class="${x.usado?'us':''}"><input type="checkbox" value="${x.id}" data-d="${x.dur}" ${x.usado?'checked':''}><button class="sm rp" data-id="${x.id}" type="button">▶</button><span class="d">${x.dur.toFixed(1)}s</span><span class="s ${x.sat>0.5?'mal':''}">${x.sat.toFixed(1)}%</span><span class="e" title="${esc(x.en)}">${esc(x.en)}</span></label>`).join('')}</div>
+    <div class="bts"><span class="tot dim"></span><span class="sp"></span>
+      <label class="dim" style="font-size:12px" title="Los clips originales llevan el ruido y la saturación de la radio: si no se quitan, el motor los copia como parte de la voz"><input type="checkbox" class="rLimpiar" checked> Limpiar ruido y saturación</label>
+      <button class="sm pri rCrear">Crear referencia con las marcadas</button>
+      <button class="sm rAuto" title="Las más largas sin saturación">Automática</button>
+      <button class="sm rIni" title="La referencia que venía de serie">Volver a la inicial</button></div>
+    <div class="bts"><span class="dim" style="font-size:12px">${j.limpia ? 'Referencia actual: limpia' : 'Referencia actual: sin limpiar'}</span><span class="sp"></span>
+      ${j.limpia ? '<button class="sm rQuitar" title="Vuelve a la misma referencia sin limpiar, para comparar">Quitar limpieza</button>' : '<button class="sm rLimp" title="Quita el ruido de fondo y repara la saturación de la referencia que hay ahora (se puede deshacer)">Limpiar la actual</button>'}</div>`;
+  const tot = () => { const s = [...p.querySelectorAll('.refl input:checked')].reduce((a,i)=>a + +i.dataset.d, 0); p.querySelector('.tot').textContent = `Marcadas: ${p.querySelectorAll('.refl input:checked').length} · ${s.toFixed(1)} s`; };
+  tot(); p.querySelector('.refl').addEventListener('change', tot);
+}
+async function crearRef(v, cuerpo){
+  const c = document.querySelector(`.voz[data-v="${v}"]`), msg = c.querySelector('.msg');
+  msg.textContent = 'Creando referencia…';
+  const j = await post('ref-crear', Object.assign({voz:v}, cuerpo));
+  if (!j.ok){ msg.innerHTML = '<span class="err">' + esc(j.error||'Error') + '</span>'; return; }
+  delete ULT[v];
+  msg.textContent = j.segundos ? `Referencia nueva: ${j.frases} frases, ${j.segundos} s. ${j.limpia ? 'Referencia limpia. ' : ''}Pulsa ▶ Probar (la primera vez rehace la huella).` : 'Referencia inicial restaurada. Pulsa ▶ Probar.';
+  c.querySelector('.refp').style.display = 'none';
+  toast(`Referencia de la voz ${vv(v)} cambiada.\nCuando te guste, «Regenerar esta voz» para aplicarla a todos sus clips.`);
+}
+async function limpiarRef(v, quitar){
+  const c = document.querySelector(`.voz[data-v="${v}"]`), msg = c.querySelector('.msg');
+  msg.textContent = quitar ? 'Quitando la limpieza…' : 'Limpiando la referencia…';
+  const j = await post('ref-limpiar', {voz:v, quitar});
+  if (!j.ok){ msg.innerHTML = '<span class="err">' + esc(j.error||'Error') + '</span>'; return; }
+  delete ULT[v];
+  const r = (j.voces||{})[String(v)] || {};
+  msg.textContent = quitar ? 'Referencia sin limpiar. Pulsa ▶ Probar para comparar.' : `Referencia limpia (${r.saturadas||0} muestras saturadas reparadas; ruido ${r.ruido_antes_db} → ${r.ruido_despues_db} dB). Pulsa ▶ Probar para comparar.`;
+  c.querySelector('.refp').style.display = 'none';
+}
+$('bLimpiarTodas').onclick = async () => {
+  if (!confirm('¿Limpiar la referencia de las 14 voces (ruido de fondo y saturación)?\nLa versión sin limpiar se guarda: en «Referencia…» de cada voz puedes volver a ella.')) return;
+  const j = await post('ref-limpiar', {});
+  if (!j.ok){ toast(j.error||'Error', true); return; }
+  for (const k in ULT) delete ULT[k];
+  toast('Referencias de las 14 voces limpiadas.\nPrueba cada voz con ▶ Probar; si alguna sonaba mejor antes, «Referencia…» → «Quitar limpieza».');
+};
+$('bRefiltrar').onclick = async () => {
+  if (!confirm('Volver a aplicar efecto de radio y volumen (de cada voz o los generales) a todo lo generado?')) return;
+  const j = await post('generar', {refiltrar:true});
+  toast(j.ok ? 'Se ha abierto la consola. Tarda poco y no usa la GPU.' : (j.error||'Error'), !j.ok);
+};
+
+(async () => {
+  try {
+    INFO = await (await fetch(api('info'))).json();
+    GENERALES = INFO.ajustes || {temperatura:0.65, velocidad:1, rms:6000, radio:1};
+    const j = await (await fetch(api('ajustes-voces'))).json(); AJ = j.voces || {}; GENERALES = j.generales || GENERALES;
+    pintar(); estadoSrv();
+    const rl = await fetch(api('lista', {t:'Corea'}));
+    if (rl.ok){
+      for (const f of csv(await rl.text()).slice(1)){
+        if (f.length < 6 || f[3] === 'ID_INVALIDO' || f[4].split(' ').length < 3) continue;
+        (ORIG[+f[2]] = ORIG[+f[2]] || []).push({id:+f[0], en:f[4]});
+      }
+    }
+  } catch(e){ toast('No se pudo cargar: ' + e.message, true); }
+  if (window.parent !== window) window.parent.postMessage({tipo:'listo', modulo:'vaj'}, location.origin);
+})();
+</script>
+</body>
+</html>
