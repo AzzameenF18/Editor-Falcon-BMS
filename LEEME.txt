@@ -1,0 +1,27 @@
+HERRAMIENTA DE TRADUCCION DE FALCON BMS 4.38
+============================================
+
+Este paquete trae solo las herramientas, sin ninguna traduccion:
+
+  Instalar.bat              Instalador: pone la traduccion en Falcon BMS y vuelve al ingles.
+  Editor_BMS\Editor_BMS.bat Editor: crea y edita la traduccion (textos, fichas, menus,
+                            campanas, imagenes, voces de radio...).
+
+PARA EMPEZAR UNA TRADUCCION
+  1. Abre Editor_BMS\Editor_BMS.bat (se abre en el navegador).
+  2. Arriba a la derecha, en "Traduccion", elige "+ Nuevo idioma..." y crea el tuyo.
+     Se crea la carpeta Idiomas\<codigo> junto al instalador, partiendo de los originales en ingles.
+  3. Traduce en las pestanas. Lo que guardas va directamente al instalador.
+  4. Cierra Falcon BMS y ejecuta Instalar.bat para probarlo en el juego.
+
+PARA REPARTIR TU TRADUCCION
+  Editor_BMS\Crear_distribucion.bat crea un zip con el instalador, el editor y tus idiomas,
+  sin lo propio de tu equipo (originales del juego, copias de seguridad, entorno de voces...).
+
+VOCES DE RADIO (opcional)
+  Pestana Voces del editor -> "Preparar entorno...". Necesita tarjeta NVIDIA (8 GB o mas
+  recomendado), unos 8 GB libres e internet la primera vez. Tambien crea las referencias de
+  cada voz desde el Falcon.tlk original de Corea (el juego tiene que estar en ingles o tener
+  su copia en Data_ORIGINAL). Ver Editor_BMS\Voces\LEEME.txt.
+
+Requisitos: Windows 10 u 11 y Falcon BMS 4.38. Mas detalles en README.md.

@@ -1,20 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-Monta un Falcon.tlk nuevo: los clips que tengan wav_es\\<tlkId>.wav se codifican en Speex
+Monta un Falcon.tlk nuevo: los clips que tengan wav\\<Teatro>\\<tlkId>.wav se codifican en Speex
 (8 kHz, calidad 8, igual que el original) y el resto se copian tal cual del Falcon.tlk original.
 
 Necesita ffmpeg con libspeex (build "full" de gyan.dev).
 
 Uso:
   python montar_tlk.py --teatro Corea --tlk "<ruta al Falcon.tlk ORIGINAL en ingles de ese teatro>" [--base "<Falcon.tlk del instalador>"]
-  Con --base, los clips sin wav se toman de ese tlk (lo ya traducido no se pierde aunque falte wav_es)
+  Con --base, los clips sin wav se toman de ese tlk (lo ya traducido no se pierde aunque falten wav)
   y solo se recodifican los wav nuevos o cambiados (montado_<Teatro>.json guarda que se monto).
-  -> crea Falcon_Corea.tlk con los wav de wav_es\\Corea
+  -> crea Idiomas\\<CODIGO>\\Falcon_Corea.tlk con los wav de Idiomas\\<CODIGO>\\wav\\Corea (--idioma)
 """
 import argparse, os, struct, subprocess, sys, tempfile, wave, shutil, csv, json, hashlib
 from concurrent.futures import ThreadPoolExecutor
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, AQUI)
+import voces_util as VU
 
 def paquetes_ogg(d):
     pk, cur, i = [], b'', 0
@@ -54,15 +56,19 @@ def codificar(ffmpeg, wavpath, tmpdir, pre_ms=0, post_ms=0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--tlk', required=True, help='Falcon.tlk ORIGINAL en ingles')
-    ap.add_argument('--teatro', required=True, help='Corea, Balcanes, Grecia o Israel')
+    ap.add_argument('--teatro', required=True, help='Corea, Balcanes, Grecia, Israel u otro teatro con mapa en el kit (Mapas)')
     ap.add_argument('--wav', default='')
     ap.add_argument('--salida', default='')
     ap.add_argument('--ffmpeg', default='ffmpeg')
     ap.add_argument('--hilos', type=int, default=8)
-    ap.add_argument('--pausa-inicio', type=int, default=50, help='ms de silencio antes de cada clip en espanol')
-    ap.add_argument('--pausa-fin', type=int, default=100, help='ms de silencio despues')
+    ap.add_argument('--pausa-inicio', type=int, default=25, help='ms de silencio antes de cada clip generado')
+    ap.add_argument('--pausa-fin', type=int, default=15, help='ms de silencio despues')
     ap.add_argument('--base', default='', help='Falcon.tlk ya traducido (el del instalador): base para lo que no tenga wav')
     ap.add_argument('--manifiesto', default='')
+    ap.add_argument('--f4talk', action='append', default=[], help='Teatro=ruta del F4Talk.csv traducido (para no montar audios de un texto anterior)')
+    ap.add_argument('--ficheros', default=None, help='carpeta Ficheros del idioma en el instalador (busca ahi F4Talk\\F4Talk_<TEATRO>.csv)')
+    ap.add_argument('--codificacion', default='cp1252')
+    ap.add_argument('--idioma', default='ES', help='codigo del idioma: carpetas por defecto en Idiomas\\<CODIGO> del kit')
     a = ap.parse_args()
 
     ff = shutil.which(a.ffmpeg) or a.ffmpeg
@@ -73,29 +79,29 @@ def main():
     if 'libspeex' not in enc:
         sys.exit('Este ffmpeg no tiene libspeex. Usa la build "full" de gyan.dev.')
 
-    a.wav = a.wav or os.path.join(AQUI, 'wav_es', a.teatro)
-    a.salida = a.salida or os.path.join(AQUI, f'Falcon_{a.teatro}.tlk')
+    base = os.path.join(AQUI, 'Idiomas', a.idioma.upper())
+    a.wav = a.wav or os.path.join(base, 'wav', a.teatro)
+    a.salida = a.salida or os.path.join(base, f'Falcon_{a.teatro}.tlk')
     b = open(a.tlk, 'rb').read()
     cab = b[:12]; n = (struct.unpack('<I', b[12:16])[0] - 12) // 4
     off = struct.unpack(f'<{n}I', b[12:12 + n * 4])
-    lista = os.path.join(AQUI, f'Lista_{a.teatro}.csv')
-    if os.path.exists(lista):
-        maxid = max(int(l.split(';')[0]) for l in open(lista, encoding='utf-8-sig').readlines()[1:]
-                    if l.split(';')[3] != 'ID_INVALIDO')
-        if maxid >= n: sys.exit(f'Este Falcon.tlk ({n} clips) no es el de {a.teatro} (la lista llega a {maxid}).')
+    if a.codificacion.isdigit(): a.codificacion = 'cp' + a.codificacion
+    VU.FICHEROS = a.ficheros
+    filas = VU.filas_teatro(a.teatro, VU.f4_pares(a.f4talk).get(a.teatro), a.codificacion)
+    validos = [int(r[0]) for r in filas if r[3] != 'ID_INVALIDO']
+    if validos and max(validos) >= n: sys.exit(f'Este Falcon.tlk ({n} clips) no es el de {a.teatro} (el mapa llega a {max(validos)}).')
     if os.path.abspath(a.tlk) == os.path.abspath(a.salida): sys.exit('La salida no puede ser el original.')
 
+    # solo los audios generados con el texto actual del F4Talk (los de un texto anterior se dejan fuera)
     nuevos = {}
+    d_wav = os.path.dirname(os.path.normpath(a.wav))
+    vale = set(VU.generados(os.path.basename(os.path.normpath(a.wav)), filas, d_wav))
     for f in os.listdir(a.wav) if os.path.isdir(a.wav) else []:
-        if f.lower().endswith('.wav') and f[:-4].isdigit() and int(f[:-4]) < n:
+        if f.lower().endswith('.wav') and f[:-4].isdigit() and int(f[:-4]) < n and int(f[:-4]) in vale:
             nuevos[int(f[:-4])] = os.path.join(a.wav, f)
-    print(f'Clips nuevos en espanol: {len(nuevos)} de {n}')
+    print(f'Clips generados: {len(nuevos)} de {n}')
     # silencio antes/despues: el de cada voz (pestana Ajuste de voces) o el general
-    voz_de = {}
-    lista = os.path.join(AQUI, f'Lista_{a.teatro}.csv')
-    if os.path.exists(lista):
-        for r in list(csv.reader(open(lista, encoding='utf-8-sig'), delimiter=';'))[1:]:
-            if len(r) > 2 and r[0].isdigit(): voz_de[int(r[0])] = int(r[2])
+    voz_de = {int(r[0]): int(r[2]) for r in filas}
     ajv = {}
     fa = os.path.join(AQUI, 'ajustes_voces.json')
     if os.path.exists(fa):
@@ -119,7 +125,7 @@ def main():
         nb = (struct.unpack('<I', bb[12:16])[0] - 12) // 4
         if nb == n: base = bb; boff = struct.unpack(f'<{n}I', bb[12:12 + n * 4])
         else: print(f'Aviso: {a.base} tiene {nb} clips (el original {n}): no se usa como base.')
-    a.manifiesto = a.manifiesto or os.path.join(AQUI, f'montado_{a.teatro}.json')
+    a.manifiesto = a.manifiesto or os.path.join(os.path.dirname(os.path.abspath(a.salida)), f'montado_{a.teatro}.json')
     man = {}
     if base is not None and os.path.exists(a.manifiesto):
         try:
@@ -136,7 +142,7 @@ def main():
         pi, pf = pausas(t); firmas[t] = md5f(ruta) + f'|{pi}|{pf}'
     reusar = {t for t in nuevos if base is not None and man.get(str(t)) == firmas[t]}
     codif = sorted(t for t in nuevos if t not in reusar)
-    print(f'Wav en espanol: {len(nuevos)}  ->  a codificar: {len(codif)}, sin cambios (de la base): {len(reusar)}')
+    print(f'Wav generados: {len(nuevos)}  ->  a codificar: {len(codif)}, sin cambios (de la base): {len(reusar)}')
 
     tmp = tempfile.mkdtemp(prefix='tlk_')
     res = {}

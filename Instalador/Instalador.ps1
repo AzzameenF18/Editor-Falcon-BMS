@@ -1,6 +1,9 @@
-﻿# Instalador de la traducción al español de Falcon BMS 4.38
+﻿# Instalador de la traducción de Falcon BMS 4.38 (varios idiomas)
 # Interfaz gráfica (WPF). Se lanza desde Instalar.bat, que está junto a la carpeta Instalador.
-# La lista de ficheros está en Archivos.csv (Teatro;Ficheros;Data).
+# Cada idioma está en Idiomas\<CÓDIGO>\ con su Archivos.csv (Teatro;Ficheros;Data), su carpeta
+# Ficheros e idioma.json (ver Idiomas.ps1). Data_ORIGINAL (originales en inglés) es común.
+# Con el formato antiguo (Archivos.csv y Ficheros sueltos junto al instalador) lo trata como el español.
+# Al instalar un idioma, lo que hubiera instalado de otro en esos teatros se quita antes.
 # La columna Data es relativa a Falcon BMS 4.38\Data. Si empieza por ..\ es relativa
 # a la carpeta de Falcon BMS 4.38 (por ejemplo ..\Launcher\FalconBMS_Alternative_Launcher.exe);
 # en ese caso el original se busca en Data_ORIGINAL sin el ..\ (Data_ORIGINAL\Launcher\...).
@@ -14,7 +17,7 @@
 # la base se añaden al final). Así un texto editado en la base llega a todos los teatros.
 # Además:
 # - No copia los ficheros que ya están igual ("ya estaba").
-# - Guarda en Falcon BMS\Traduccion_ES_instalado.txt el MD5 de lo instalado; así, si un
+# - Guarda en Falcon BMS\Traduccion_<CÓDIGO>_instalado.txt el MD5 de lo instalado; así, si un
 #   fichero del juego no es ni el original guardado ni lo que instaló el instalador, es que
 #   lo ha actualizado BMS: guarda el nuevo original (el anterior va a Data_ORIGINAL\_anteriores)
 #   y avisa de que su traducción puede estar desfasada.
@@ -35,7 +38,7 @@ $creado = $false
 $Mutex = New-Object System.Threading.Mutex($true, 'Local\Instalador_Traduccion_BMS', [ref]$creado)
 if (-not $creado) {
     $ok = $false
-    try { Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.Interaction]::AppActivate('Traducción al español - Falcon BMS 4.38'); $ok = $true } catch { }
+    try { Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.Interaction]::AppActivate('Traducción de Falcon BMS 4.38'); $ok = $true } catch { }
     if (-not $ok) { [void][System.Windows.MessageBox]::Show('El instalador ya está abierto.', 'Traducción de Falcon BMS', 'OK', 'Information') }
     exit 0
 }
@@ -45,15 +48,29 @@ trap {
 }
 
 $Aqui = $PSScriptRoot
-$Csv  = Join-Path $Aqui 'Archivos.csv'
-# Ficheros y Data_ORIGINAL pueden estar dentro de la carpeta Instalador o junto a ella
+$ModIdiomas = Join-Path $Aqui 'Idiomas.ps1'
+if (-not (Test-Path -LiteralPath $ModIdiomas)) {
+    [void][System.Windows.MessageBox]::Show("Falta Idiomas.ps1 junto al instalador:`n$ModIdiomas", 'Instalador', 'OK', 'Error'); exit 1
+}
+. $ModIdiomas
+$ModTeatros = Join-Path $Aqui 'Teatros.ps1'
+if (-not (Test-Path -LiteralPath $ModTeatros)) {
+    [void][System.Windows.MessageBox]::Show("Falta Teatros.ps1 junto al instalador:`n$ModTeatros", 'Instalador', 'OK', 'Error'); exit 1
+}
+. $ModTeatros
+# Data_ORIGINAL puede estar dentro de la carpeta Instalador o junto a ella
 function Buscar-Carpeta([string]$nombre) {
     $dentro = Join-Path $Aqui $nombre
     if (Test-Path $dentro) { return $dentro }
     return (Join-Path (Split-Path $Aqui -Parent) $nombre)
 }
-$DirFicheros = Buscar-Carpeta 'Ficheros'
 $DirOriginal = Buscar-Carpeta 'Data_ORIGINAL'
+# idioma elegido (lo fija Poner-Idioma): su Archivos.csv y su carpeta Ficheros
+$Csv = Join-Path $Aqui 'Archivos.csv'
+$DirFicheros = Buscar-Carpeta 'Ficheros'
+$script:Idiomas = @()
+$script:Idi = $null
+$script:Regs = @{}
 $Ansi = [Text.Encoding]::GetEncoding(1252)
 $script:Temporal = $null
 $script:LogTexto = New-Object System.Collections.ArrayList
@@ -94,19 +111,13 @@ function Combinar-Irc([string]$base, [string]$cambios, [string]$salida) {
     return @($sust, $nuevos.Count)
 }
 
-# Teatros: clave del CSV, nombre visible, carpeta que indica que está instalado (relativa a Data)
-$Teatros = @(
-    [pscustomobject]@{ Clave = 'COREA';    Nombre = 'Corea';                   Detalle = 'Falcon BMS 4.38';   Carpeta = '' }
-    [pscustomobject]@{ Clave = 'TVT';      Nombre = 'Corea Equipo vs Equipo';  Detalle = 'Add-On Korea TvT';  Carpeta = 'Add-On Korea TvT' }
-    [pscustomobject]@{ Clave = 'BALCANES'; Nombre = 'Balcanes';                Detalle = 'Add-On Balkans';    Carpeta = 'Add-On Balkans' }
-    [pscustomobject]@{ Clave = 'GRECIA';   Nombre = 'Grecia';                  Detalle = 'Add-On Hellas';     Carpeta = 'Add-On Hellas' }
-    [pscustomobject]@{ Clave = 'ISRAEL';   Nombre = 'Israel';                  Detalle = 'Add-On Israel';     Carpeta = 'Add-On Israel' }
-)
+# Teatros (Teatros.ps1): los conocidos, los Add-On que haya en Data y los de Archivos.csv; se recalculan en Detectar
+$Teatros = @(Teatros-Detectar $null @())
 
 [xml]$Xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Traducción al español - Falcon BMS 4.38"
+        Title="Traducción de Falcon BMS 4.38"
         Width="1080" Height="640" MinWidth="680" MinHeight="560"
         WindowStartupLocation="CenterScreen" WindowStyle="None" AllowsTransparency="True"
         Background="Transparent" ResizeMode="CanResizeWithGrip" FontFamily="Segoe UI">
@@ -245,8 +256,10 @@ $Teatros = @(
       </Border>
       <StackPanel Grid.Column="0">
         <StackPanel Orientation="Horizontal">
-          <TextBlock Text="Traducción al español" Foreground="{StaticResource Texto}" FontSize="28" FontWeight="Light"/>
+          <TextBlock x:Name="TxtTitulo" Text="Traducción" Foreground="{StaticResource Texto}" FontSize="28" FontWeight="Light"/>
           <TextBlock x:Name="TxtVersion" Foreground="{StaticResource Tenue}" FontSize="13" VerticalAlignment="Bottom" Margin="14,0,0,6"/>
+          <Button x:Name="BtnIdioma" Style="{StaticResource Boton}" Padding="10,4" FontSize="12" Margin="16,0,0,4" VerticalAlignment="Bottom"
+                  Content="Idioma" ToolTip="Idioma de la traducción que se instala (el editor usa el mismo)"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
           <Border CornerRadius="10" Background="#26303A" Padding="10,3" Margin="0,0,10,0">
@@ -338,7 +351,7 @@ foreach ($c in @((Join-Path $Aqui 'Editor_BMS\Editor_BMS.bat'), (Join-Path (Spli
     if (Test-Path -LiteralPath $c -PathType Leaf) { $Editor = $c; break }
 }
 if ($Editor) { $BtnEditor.Visibility = 'Visible'; $BtnEditor.ToolTip = $BtnEditor.ToolTip + "`n" + (Split-Path $Editor -Parent) }
-$BtnComprobar = Ctl 'BtnComprobar'; $TxtVersion = Ctl 'TxtVersion'
+$BtnComprobar = Ctl 'BtnComprobar'; $TxtVersion = Ctl 'TxtVersion'; $TxtTitulo = Ctl 'TxtTitulo'; $BtnIdioma = Ctl 'BtnIdioma'
 if ($Version) { $TxtVersion.Text = $Version }
 
 $Brush = @{
@@ -394,9 +407,66 @@ function Elegir-Ruta {
     return $null
 }
 
-function Leer-Lista {
-    if (-not (Test-Path $Csv)) { return @() }
-    return @(Import-Csv -Path $Csv -Delimiter ';' -Encoding UTF8 | Where-Object { $_.Teatro -and $_.Data })
+function Leer-Lista([string]$csv) {
+    if (-not $csv) { $csv = $script:Csv }
+    if (-not $csv -or -not (Test-Path -LiteralPath $csv)) { return @() }
+    return @(Import-Csv -LiteralPath $csv -Delimiter ';' -Encoding UTF8 | Where-Object { $_.Teatro -and $_.Data })
+}
+
+# ---------- idiomas ----------
+function Cod-Idioma { if ($script:Idi) { return $script:Idi.codigo } else { return 'ES' } }
+function Nombre-Idioma([string]$cod) {
+    if (-not $cod) { if ($script:Idi) { return $script:Idi.nombre } else { return '' } }
+    $i = @($script:Idiomas | Where-Object { $_.codigo -eq $cod }) | Select-Object -First 1
+    if ($i) { return $i.nombre } else { return $cod }
+}
+function Cargar-Idiomas { $script:Idiomas = @(Idiomas-Lista $Aqui) }
+function Poner-Idioma($i) {
+    $script:Idi = $i
+    if ($i) { $script:Csv = $i.csv; $script:DirFicheros = $i.ficheros }
+    if ($i) {
+        $n = Nombre-Idioma
+        $TxtTitulo.Text = 'Traducción: ' + $n
+        $BtnEsp.Content = 'Instalar ' + $n
+        $BtnIdioma.Content = 'Idioma: ' + $i.nombre + '   ' + [char]0x25BE
+    } else {
+        # sin ningún idioma (instalación limpia del paquete): no hay nada que instalar
+        $TxtTitulo.Text = 'Traducción de Falcon BMS'
+        $BtnEsp.Content = 'Instalar traducción'
+        $BtnIdioma.Content = 'Idioma: ninguno   ' + [char]0x25BE
+    }
+    Botones-Idioma
+    if ($i -and -not $i.legado) { Idioma-Poner-Actual $Aqui $i.codigo }
+}
+# sin idioma elegido no se puede instalar ni comprobar (Restaurar inglés sí: usa la lista de todos los idiomas)
+function Botones-Idioma {
+    $hay = [bool]$script:Idi
+    $BtnEsp.IsEnabled = $hay -and $BtnSalir.IsEnabled
+    $BtnComprobar.IsEnabled = $hay -and $BtnSalir.IsEnabled
+    $BtnEng.IsEnabled = ($script:Idiomas.Count -gt 0) -and $BtnSalir.IsEnabled
+}
+function Menu-Idiomas {
+    $m = New-Object Windows.Controls.ContextMenu
+    foreach ($i in $script:Idiomas) {
+        $it = New-Object Windows.Controls.MenuItem
+        $it.Header = $i.nombre + '   (' + $i.codigo + ')'
+        $it.IsChecked = [bool]($script:Idi -and $i.codigo -eq $script:Idi.codigo)
+        $it.Tag = $i.codigo
+        $it.Add_Click({
+            param($s)
+            $x = @($script:Idiomas | Where-Object { $_.codigo -eq $s.Tag }) | Select-Object -First 1
+            if ($x) { Poner-Idioma $x; Estado-Actual }
+        })
+        [void]$m.Items.Add($it)
+    }
+    if ($script:Idiomas.Count) { [void]$m.Items.Add((New-Object Windows.Controls.Separator)) }
+    $n = New-Object Windows.Controls.MenuItem
+    $n.Header = $(if ($Editor) { 'Los idiomas nuevos se crean en el editor (Abrir editor)' } else { 'Los idiomas nuevos se crean con el editor' })
+    $n.IsEnabled = $false
+    [void]$m.Items.Add($n)
+    $m.PlacementTarget = $BtnIdioma
+    $m.Placement = [Windows.Controls.Primitives.PlacementMode]::Bottom
+    $m.IsOpen = $true
 }
 
 $script:BMS = $null
@@ -404,11 +474,12 @@ $script:Cajas = @{}
 
 function Detectar {
     $data = Join-Path $script:BMS 'Data'
+    $script:Teatros = @(Teatros-Detectar $data @($script:Idiomas | ForEach-Object { $_.csv }))
     $TxtRuta.Text = $script:BMS
     $PanelTeatros.Children.Clear()
     $script:Cajas = @{}
     foreach ($t in $Teatros) {
-        $ok = ($t.Carpeta -eq '') -or (Test-Path (Join-Path $data $t.Carpeta))
+        $ok = ($t.Carpeta -eq '') -or ($t.Carpeta -and (Test-Path -LiteralPath (Join-Path $data $t.Carpeta)))
         $cb = New-Object Windows.Controls.CheckBox
         $cb.Style = $Win.FindResource('Teatro')
         $sp = New-Object Windows.Controls.StackPanel
@@ -489,21 +560,45 @@ function Fuente-Esp($f, [string]$clave, [string]$rel) {
 # ---------- registro de lo instalado (en la carpeta de Falcon BMS) ----------
 # Guarda el MD5 de cada fichero que instala el instalador. Sirve para distinguir
 # "versión anterior de la traducción" de "fichero actualizado por BMS".
-function Ruta-Registro { return (Join-Path $script:BMS 'Traduccion_ES_instalado.txt') }
-function Leer-Registro {
+# Un registro por idioma: Traduccion_<CÓDIGO>_instalado.txt (el del español sigue llamándose igual que antes).
+function Ruta-Registro([string]$cod) { if (-not $cod) { $cod = Cod-Idioma }; return (Join-Path $script:BMS ('Traduccion_' + $cod + '_instalado.txt')) }
+function Leer-Registro([string]$cod) {
     $h = @{}
-    $p = Ruta-Registro
-    $script:HayRegistro = Test-Path -LiteralPath $p
-    if ($script:HayRegistro) {
+    $p = Ruta-Registro $cod
+    if (Test-Path -LiteralPath $p) {
         foreach ($l in [IO.File]::ReadAllLines($p, [Text.Encoding]::UTF8)) {
             $i = $l.LastIndexOf('|'); if ($i -gt 0) { $h[$l.Substring(0, $i).ToLower()] = $l.Substring($i + 1) }
         }
     }
     return $h
 }
-function Guardar-Registro($h) {
+# Registros de todos los idiomas (también de códigos que ya no están en Idiomas, si dejaron registro)
+function Leer-Registros {
+    $r = @{}
+    $script:HayRegistro = $false
+    $cods = @($script:Idiomas | ForEach-Object { $_.codigo })
+    foreach ($f in @(Get-ChildItem -LiteralPath $script:BMS -Filter 'Traduccion_*_instalado.txt' -File -ErrorAction SilentlyContinue)) {
+        $script:HayRegistro = $true
+        $m = [regex]::Match($f.Name, '^Traduccion_(.+)_instalado\.txt$')
+        if ($m.Success -and $cods -notcontains $m.Groups[1].Value.ToUpper()) { $cods += $m.Groups[1].Value.ToUpper() }
+    }
+    if ($cods -notcontains (Cod-Idioma)) { $cods += Cod-Idioma }
+    foreach ($c in $cods) { $r[$c] = Leer-Registro $c }
+    return $r
+}
+function Guardar-Registro([string]$cod, $h) {
+    $p = Ruta-Registro $cod
+    # no se crean registros vacíos de idiomas que no se han instalado nunca
+    if ($h.Count -eq 0 -and -not (Test-Path -LiteralPath $p)) { return }
     $lineas = @($h.Keys | Sort-Object | ForEach-Object { $_ + '|' + $h[$_] })
-    try { [IO.File]::WriteAllLines((Ruta-Registro), [string[]]$lineas, (New-Object Text.UTF8Encoding($true))) } catch { }
+    try { [IO.File]::WriteAllLines($p, [string[]]$lineas, (New-Object Text.UTF8Encoding($true))) } catch { }
+}
+# Idioma (distinto del elegido) cuya traducción es el fichero del juego, según los registros
+function Idioma-De-Fichero([string]$k, [string]$hash) {
+    foreach ($c in $script:Regs.Keys) {
+        if ($c -ne (Cod-Idioma) -and $script:Regs[$c].ContainsKey($k) -and $script:Regs[$c][$k] -eq $hash) { return $c }
+    }
+    return $null
 }
 
 # ---------- Falcon BMS en marcha ----------
@@ -529,7 +624,9 @@ function Estado-Teatro([string]$clave) {
     # n = ficheros del teatro que hay en el juego; igual = los que son idénticos en inglés y en español
     # (no cuentan para decidir el idioma); es / en / otro = el resto
     # desc = iguales a la traducción pero sin original con que comparar (no se sabe si cambian)
-    $e = [pscustomobject]@{ n = 0; igual = 0; desc = 0; es = 0; en = 0; otro = 0; lEs = (New-Object System.Collections.ArrayList); lOtro = (New-Object System.Collections.ArrayList); lDesc = (New-Object System.Collections.ArrayList); lIgual = (New-Object System.Collections.ArrayList) }
+    # otrosIdi = ficheros que son la traducción de otro idioma instalado (código -> cuántos)
+    $e = [pscustomobject]@{ n = 0; igual = 0; desc = 0; es = 0; en = 0; otro = 0; lEs = (New-Object System.Collections.ArrayList); lOtro = (New-Object System.Collections.ArrayList); lDesc = (New-Object System.Collections.ArrayList); lIgual = (New-Object System.Collections.ArrayList)
+                            otrosIdi = @{}; lOtroIdi = (New-Object System.Collections.ArrayList) }
     foreach ($f in @($script:Lista | Where-Object { $_.Teatro -eq $clave })) {
         $d = Destino $f
         if (-not (Test-Path -LiteralPath $d.dst -PathType Leaf)) { continue }
@@ -544,25 +641,38 @@ function Estado-Teatro([string]$clave) {
             if ($hayOrig) { $e.es++; [void]$e.lEs.Add($d.rel) }
             else { $e.desc++; [void]$e.lDesc.Add($d.rel) }
         }
-        elseif (-not $hayOrig) { $e.en++ }
-        else { $e.otro++; [void]$e.lOtro.Add($d.rel) }
+        else {
+            $cx = Idioma-De-Fichero $d.rel.ToLower() (Md5 $d.dst)
+            if ($cx) { $e.otrosIdi[$cx] = 1 + [int]$e.otrosIdi[$cx]; [void]$e.lOtroIdi.Add($d.rel + '   (' + $cx + ')') }
+            elseif (-not $hayOrig) { $e.en++ }
+            else { $e.otro++; [void]$e.lOtro.Add($d.rel) }
+        }
     }
     return $e
 }
 function Estado-Actual {
     $TxtEstado.Text = '●  Comprobando…'; $TxtEstado.Foreground = $Brush.Tenue
     Refrescar
+    if (-not $script:Idi) {
+        foreach ($x in $script:EstadoTxt.Values) { if ($x) { $x.Text = ''; $x.ToolTip = $null } }
+        $TxtEstado.Text = '●  Sin ninguna traducción'; $TxtEstado.Foreground = $Brush.Tenue
+        $TxtResumen.Text = 'No hay ningún idioma de la traducción. Créalo con el editor (Traducción → ＋ Nuevo idioma…) o copia su carpeta en Idiomas.'
+        return
+    }
     $script:Lista = Leer-Lista
-    $resumen = @{ es = @(); en = @(); mezcla = @() }
+    $script:Regs = Leer-Registros
+    $nom = Nombre-Idioma
+    $resumen = @{ es = @(); en = @(); mezcla = @(); otro = @{} }
     foreach ($t in $Teatros) {
         $txt = $script:EstadoTxt[$t.Clave]
         if (-not $txt -or -not $script:Instalado[$t.Clave]) { continue }
         $e = Estado-Teatro $t.Clave
         $script:Detalle[$t.Clave] = $e
         $txt.ToolTip = $null
-        if ($e.lEs.Count -or $e.lOtro.Count -or $e.lDesc.Count) {
+        if ($e.lEs.Count -or $e.lOtro.Count -or $e.lDesc.Count -or $e.lOtroIdi.Count) {
             $tip = @()
-            if ($e.lEs.Count) { $tip += 'En español:'; $tip += @($e.lEs | ForEach-Object { '   ' + $_ }) }
+            if ($e.lEs.Count) { $tip += "En $($nom):"; $tip += @($e.lEs | ForEach-Object { '   ' + $_ }) }
+            if ($e.lOtroIdi.Count) { $tip += 'En otro idioma de la traducción:'; $tip += @($e.lOtroIdi | ForEach-Object { '   ' + $_ }) }
             if ($e.lOtro.Count) { $tip += 'Distintos del original y de la traducción:'; $tip += @($e.lOtro | ForEach-Object { '   ' + $_ }) }
             if ($e.lDesc.Count) { $tip += 'Iguales a la traducción, sin original para comparar (se guardará al instalar):'; $tip += @($e.lDesc | ForEach-Object { '   ' + $_ }) }
             $txt.ToolTip = ($tip -join "`n")
@@ -575,17 +685,24 @@ function Estado-Actual {
             else { $txt.Text = '●  sin diferencias'; $txt.Foreground = $Brush.Tenue }
             continue
         }
-        if ($e.es -eq $cuenta) { $txt.Text = '●  español' + $extra; $txt.Foreground = $Brush.Verde; $resumen.es += $t.Nombre }
-        elseif ($e.es -eq 0 -and $e.otro -eq 0) { $txt.Text = '●  inglés' + $extra; $txt.Foreground = $Brush.Tenue; $resumen.en += $t.Nombre }
+        $nOtros = 0; foreach ($v in $e.otrosIdi.Values) { $nOtros += $v }
+        if ($e.es -eq $cuenta) { $txt.Text = '●  ' + $nom + $extra; $txt.Foreground = $Brush.Verde; $resumen.es += $t.Nombre }
+        elseif ($e.es -eq 0 -and $e.otro -eq 0 -and $nOtros -eq 0) { $txt.Text = '●  inglés' + $extra; $txt.Foreground = $Brush.Tenue; $resumen.en += $t.Nombre }
+        elseif ($e.es -eq 0 -and $e.otro -eq 0 -and $e.otrosIdi.Count -eq 1 -and $e.en -eq 0) {
+            $cx = @($e.otrosIdi.Keys)[0]
+            $txt.Text = '●  ' + (Nombre-Idioma $cx) + ' (otro idioma)' + $extra; $txt.Foreground = $Brush.Amar; $resumen.otro[$cx] = $true
+        }
         else {
-            $txt.Text = "●  mezcla: $($e.es) de $cuenta en español" + $(if ($e.otro) { " · $($e.otro) distintos" } else { '' })
+            $txt.Text = "●  mezcla: $($e.es) de $cuenta en $nom" + $(if ($nOtros) { " · $nOtros en otro idioma" } else { '' }) + $(if ($e.otro) { " · $($e.otro) distintos" } else { '' })
             $txt.Foreground = $Brush.Amar; $resumen.mezcla += $t.Nombre
         }
         Refrescar
     }
-    if ($resumen.mezcla.Count -eq 0 -and $resumen.en.Count -eq 0 -and $resumen.es.Count) { $TxtEstado.Text = '●  Instalado: español'; $TxtEstado.Foreground = $Brush.Verde }
-    elseif ($resumen.mezcla.Count -eq 0 -and $resumen.es.Count -eq 0 -and $resumen.en.Count) { $TxtEstado.Text = '●  Instalado: inglés'; $TxtEstado.Foreground = $Brush.Tenue }
-    elseif ($resumen.es.Count -or $resumen.en.Count -or $resumen.mezcla.Count) { $TxtEstado.Text = '●  Instalación mixta (mira cada teatro)'; $TxtEstado.Foreground = $Brush.Amar }
+    $nOt = $resumen.otro.Count
+    if ($resumen.mezcla.Count -eq 0 -and $resumen.en.Count -eq 0 -and $nOt -eq 0 -and $resumen.es.Count) { $TxtEstado.Text = '●  Instalado: ' + $nom; $TxtEstado.Foreground = $Brush.Verde }
+    elseif ($resumen.mezcla.Count -eq 0 -and $resumen.es.Count -eq 0 -and $nOt -eq 0 -and $resumen.en.Count) { $TxtEstado.Text = '●  Instalado: inglés'; $TxtEstado.Foreground = $Brush.Tenue }
+    elseif ($resumen.mezcla.Count -eq 0 -and $resumen.es.Count -eq 0 -and $resumen.en.Count -eq 0 -and $nOt -eq 1) { $TxtEstado.Text = '●  Instalado: ' + (Nombre-Idioma @($resumen.otro.Keys)[0]) + ' (no es el idioma elegido)'; $TxtEstado.Foreground = $Brush.Amar }
+    elseif ($resumen.es.Count -or $resumen.en.Count -or $resumen.mezcla.Count -or $nOt) { $TxtEstado.Text = '●  Instalación mixta (mira cada teatro)'; $TxtEstado.Foreground = $Brush.Amar }
     else { $TxtEstado.Text = '●  Estado desconocido'; $TxtEstado.Foreground = $Brush.Amar }
     Borrar-Temporal
 }
@@ -595,10 +712,12 @@ function Listar-Estado($elegidos) {
     $hay = $false
     foreach ($t in $elegidos) {
         $e = $script:Detalle[$t.Clave]
-        if (-not $e -or ($e.lEs.Count -eq 0 -and $e.lOtro.Count -eq 0 -and $e.lDesc.Count -eq 0)) { continue }
-        if (-not $hay) { Escribir ''; Escribir 'Ficheros que no están en inglés (ES / ≠) o que no se pueden comprobar (?):' 'Acento'; $hay = $true }
+        if (-not $e -or ($e.lEs.Count -eq 0 -and $e.lOtro.Count -eq 0 -and $e.lDesc.Count -eq 0 -and $e.lOtroIdi.Count -eq 0)) { continue }
+        $cod = Cod-Idioma
+        if (-not $hay) { Escribir ''; Escribir "Ficheros que no están en inglés ($cod / otro idioma / ≠) o que no se pueden comprobar (?):" 'Acento'; $hay = $true }
         Escribir ('  ' + $t.Nombre) 'Texto'
-        foreach ($x in $e.lEs) { Escribir ('    ES  ' + $x) 'Amar' }
+        foreach ($x in $e.lEs) { Escribir ('    ' + $cod.PadRight(3) + ' ' + $x) 'Amar' }
+        foreach ($x in $e.lOtroIdi) { Escribir ('    ··  ' + $x) 'Amar' }
         foreach ($x in $e.lOtro) { Escribir ('    ≠   ' + $x + '   (ni original ni traducción)') 'Amar' }
         foreach ($x in $e.lDesc) { Escribir ('    ?   ' + $x + '   (igual a la traducción; sin original para comparar)') 'Tenue' }
     }
@@ -606,14 +725,15 @@ function Listar-Estado($elegidos) {
 }
 
 function Bloquear([bool]$si) {
-    foreach ($b in $BtnEsp, $BtnEng, $BtnComprobar, $BtnJugar, $BtnSalir, $BtnEditor) { $b.IsEnabled = -not $si }
+    foreach ($b in $BtnEsp, $BtnEng, $BtnComprobar, $BtnJugar, $BtnSalir, $BtnEditor, $BtnIdioma) { $b.IsEnabled = -not $si }
     foreach ($c in $script:Cajas.Values) { if ($si) { $c.Tag = $c.IsEnabled; $c.IsEnabled = $false } else { $c.IsEnabled = [bool]$c.Tag } }
+    if (-not $si) { Botones-Idioma }
 }
 
 function Guardar-Log([string]$titulo) {
     try {
         $p = Join-Path $Aqui 'Registro.log'
-        $cab = @("$titulo  ·  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')", "Falcon BMS: $script:BMS", "Traducción: $Version", '')
+        $cab = @("$titulo  ·  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')", "Falcon BMS: $script:BMS", "Traducción: $Version  ·  idioma $(Cod-Idioma) ($Csv)", '')
         [IO.File]::WriteAllLines($p, [string[]]($cab + $script:LogTexto), (New-Object Text.UTF8Encoding($true)))
     } catch { }
 }
@@ -673,6 +793,12 @@ function Comprobar {
 
 function Instalar([string]$modo) {
     $lista = Leer-Lista
+    if ($modo -eq 'ENG') {
+        # restaurar el inglés: todo lo que cualquier idioma pueda haber instalado (Data_ORIGINAL es común)
+        $vistos = @{}
+        $lista = @(foreach ($i in $script:Idiomas) { foreach ($f in (Leer-Lista $i.csv)) {
+            $k = $f.Teatro + '|' + $f.Data.ToLower(); if (-not $vistos.ContainsKey($k)) { $vistos[$k] = $true; $f } } })
+    }
     if ($lista.Count -eq 0) {
         [void][Windows.MessageBox]::Show("No se encuentra Archivos.csv o está vacío.`n$Csv", 'Falta la lista', 'OK', 'Error'); return
     }
@@ -693,10 +819,12 @@ function Instalar([string]$modo) {
     Bloquear $true
     $Log.Children.Clear(); $script:LogTexto = New-Object System.Collections.ArrayList
     $Barra.Maximum = [Math]::Max(1, $trabajo.Count); $Barra.Value = 0
-    if ($modo -eq 'ESP') { $TxtResumen.Text = 'Instalando traducción al español...' } else { $TxtResumen.Text = 'Restaurando originales en inglés...' }
+    $nom = Nombre-Idioma; $cod = Cod-Idioma
+    if ($modo -eq 'ESP') { $TxtResumen.Text = "Instalando traducción: $nom..." } else { $TxtResumen.Text = 'Restaurando originales en inglés...' }
     $TxtResumen.Foreground = $Brush.Tenue
-    $cop = 0; $igual = 0; $omi = 0; $err = 0; $perm = 0; $bak = 0; $act = 0; $sinOrig = 0; $carp = 0
-    $reg = Leer-Registro
+    $cop = 0; $igual = 0; $omi = 0; $err = 0; $perm = 0; $bak = 0; $act = 0; $sinOrig = 0; $carp = 0; $quit = 0
+    $script:Regs = Leer-Registros
+    $reg = $script:Regs[$cod]
     $sello = Get-Date -Format 'yyyyMMdd_HHmmss'
     if ($modo -eq 'ESP' -and -not (Test-Path -LiteralPath $DirOriginal)) {
         Escribir 'Primera instalación: se crea Data_ORIGINAL con los ficheros originales de tu Falcon BMS.' 'Acento'
@@ -706,6 +834,22 @@ function Instalar([string]$modo) {
         Escribir $t.Nombre 'Acento' -Titulo
         $p0 = @($cop, $igual, $omi, $err, $sinOrig)
         $filasT = @($trabajo | Where-Object { $_.Teatro -eq $t.Clave })
+        if ($modo -eq 'ESP') {
+            # lo que otro idioma instaló en este teatro y este idioma no trae: se vuelve al original
+            $propios = @{}; foreach ($f in $filasT) { $propios[(Destino $f).rel.ToLower()] = $true }
+            foreach ($i in @($script:Idiomas | Where-Object { $_.codigo -ne $cod })) {
+                $rI = $script:Regs[$i.codigo]
+                if (-not $rI -or $rI.Count -eq 0) { continue }
+                foreach ($f in @(Leer-Lista $i.csv | Where-Object { $_.Teatro -eq $t.Clave })) {
+                    $d = Destino $f; $k = $d.rel.ToLower()
+                    if ($propios.ContainsKey($k) -or -not $rI.ContainsKey($k)) { continue }
+                    if (-not (Test-Path -LiteralPath $d.dst -PathType Leaf) -or (Md5 $d.dst) -ne $rI[$k]) { $rI.Remove($k); continue }
+                    if (-not (Test-Path -LiteralPath $d.orig -PathType Leaf)) { Escribir ('  !  ' + $d.rel + "   es de $($i.nombre) y no hay original guardado: se queda") 'Amar'; continue }
+                    try { Copiar-Fichero $d.orig $d.dst; $rI.Remove($k); $quit++; Escribir ('  ↺  ' + $d.rel + "   (era de $($i.nombre): vuelve al original)") 'Tenue' }
+                    catch { Escribir ('  ✗  ' + $d.rel + '   ' + $_.Exception.Message) 'Rojo'; $err++ }
+                }
+            }
+        }
         foreach ($f in $filasT) {
             $Barra.Value = $Barra.Value + 1
             $d = Destino $f
@@ -723,11 +867,14 @@ function Instalar([string]$modo) {
                         # es un fichero igual en los dos idiomas (p. ej. un .idx que no cambia)
                         try { Copiar-Fichero $d.dst $d.orig; $bak++; $txtIgual = '   (igual en inglés y en español)' } catch { }
                     } elseif ((Test-Path -LiteralPath $d.orig) -and (Mismo-Fichero $d.orig $d.dst)) { $txtIgual = '   (igual en inglés y en español)' }
-                    Escribir ('  =  ' + $d.rel + $txtIgual) 'Tenue'; $igual++; $reg[$k] = Md5 $d.dst; continue
+                    Escribir ('  =  ' + $d.rel + $txtIgual) 'Tenue'; $igual++; $reg[$k] = Md5 $d.dst
+                    foreach ($c in @($script:Regs.Keys)) { if ($c -ne $cod) { $script:Regs[$c].Remove($k) } }
+                    continue
                 }
                 if ($existe) {
                     $hDst = Md5 $d.dst
-                    $nuestro = $reg.ContainsKey($k) -and $reg[$k] -eq $hDst
+                    # "nuestro" = lo instaló este instalador (en este idioma o en otro)
+                    $nuestro = ($reg.ContainsKey($k) -and $reg[$k] -eq $hDst) -or [bool](Idioma-De-Fichero $k $hDst)
                     if (-not (Test-Path -LiteralPath $d.orig)) {
                         if ($nuestro) {
                             Escribir ('  !  ' + $d.rel + '   no hay original guardado (el del juego es una traducción anterior)') 'Amar'
@@ -755,18 +902,23 @@ function Instalar([string]$modo) {
             } else {
                 $src = $d.orig
                 if (-not (Test-Path -LiteralPath $src -PathType Leaf)) {
-                    if ($existe) { Escribir ('  !  ' + $d.rel + '   no hay original guardado: se queda en español') 'Amar'; $sinOrig++ }
+                    if ($existe) { Escribir ('  !  ' + $d.rel + '   no hay original guardado: se queda traducido') 'Amar'; $sinOrig++ }
                     else { Escribir ('  –  ' + $d.rel + '   (no está en el juego)') 'Tenue'; $omi++ }
                     continue
                 }
                 if ($existe -and (Mismo-Fichero $src $d.dst)) {
-                    Escribir ('  =  ' + $d.rel + '   (ya estaba en inglés)') 'Tenue'; $igual++; $reg.Remove($k); continue
+                    Escribir ('  =  ' + $d.rel + '   (ya estaba en inglés)') 'Tenue'; $igual++
+                    foreach ($c in @($script:Regs.Keys)) { $script:Regs[$c].Remove($k) }
+                    continue
                 }
             }
             try {
                 Copiar-Fichero $src $d.dst
                 Escribir ('  ✓  ' + $d.rel + $nota) 'Verde'; $cop++
-                if ($modo -eq 'ESP') { $reg[$k] = Md5 $d.dst } else { $reg.Remove($k) }
+                if ($modo -eq 'ESP') {
+                    $reg[$k] = Md5 $d.dst
+                    foreach ($c in @($script:Regs.Keys)) { if ($c -ne $cod) { $script:Regs[$c].Remove($k) } }
+                } else { foreach ($c in @($script:Regs.Keys)) { $script:Regs[$c].Remove($k) } }
             } catch [UnauthorizedAccessException] {
                 Escribir ('  ✗  ' + $d.rel + '   sin permiso para escribir') 'Rojo'; $err++; $perm++
             } catch {
@@ -782,9 +934,12 @@ function Instalar([string]$modo) {
         Escribir $sub 'Tenue'
     }
     Borrar-Temporal
-    Guardar-Registro $reg
+    foreach ($c in @($script:Regs.Keys)) { Guardar-Registro $c $script:Regs[$c] }
     $total = $trabajo.Count
-    if ($modo -eq 'ESP') { $TxtResumen.Text = "$total ficheros:  copiados $cop  ·  ya estaban $igual  ·  no encontrados $omi  ·  errores $err" }
+    if ($modo -eq 'ESP') {
+        $TxtResumen.Text = "$total ficheros:  copiados $cop  ·  ya estaban $igual  ·  no encontrados $omi  ·  errores $err"
+        if ($quit) { $TxtResumen.Text += "  ·  de otro idioma, devueltos al original $quit" }
+    }
     else { $TxtResumen.Text = "$total ficheros:  restaurados $cop  ·  ya estaban $igual  ·  sin original $sinOrig  ·  no están $omi  ·  errores $err" }
     if ($bak -gt 0) {
         $TxtResumen.Text += "    ·    Originales guardados: $bak"
@@ -798,14 +953,14 @@ function Instalar([string]$modo) {
     }
     if ($sinOrig -gt 0) {
         Escribir ''
-        Escribir ("$sinOrig ficheros siguen en español porque no hay copia de su original en Data_ORIGINAL.") 'Amar'
+        Escribir ("$sinOrig ficheros siguen traducidos porque no hay copia de su original en Data_ORIGINAL.") 'Amar'
     }
     if ($carp -gt 0) { Escribir ''; Escribir ("$carp ficheros se copiaron a carpetas que no existían: revisa sus rutas en Archivos.csv.") 'Amar' }
     if ($err -gt 0) { $TxtResumen.Foreground = $Brush.Rojo }
     elseif ($act -gt 0 -or $sinOrig -gt 0 -or $carp -gt 0) { $TxtResumen.Foreground = $Brush.Amar }
     elseif ($modo -eq 'ESP') { $TxtResumen.Foreground = $Brush.Verde }
     else { $TxtResumen.Foreground = $Brush.Texto }
-    Guardar-Log $(if ($modo -eq 'ESP') { 'Instalar español' } else { 'Restaurar inglés' })
+    Guardar-Log $(if ($modo -eq 'ESP') { "Instalar $nom" } else { 'Restaurar inglés' })
     Bloquear $false
     if ($perm -gt 0) {
         [void][Windows.MessageBox]::Show("No se pudieron escribir $perm ficheros por falta de permisos.`n`nSi Falcon BMS está en «Archivos de programa» o en otra carpeta protegida, cierra el instalador y ábrelo con clic derecho en Instalar.bat → «Ejecutar como administrador».", 'Permisos', 'OK', 'Warning')
@@ -827,6 +982,7 @@ function Copiar-Fichero([string]$src, [string]$dst) {
 $BtnSalir.Add_Click({ $Win.Close() })
 $BtnEsp.Add_Click({ Instalar 'ESP' })
 $BtnComprobar.Add_Click({ Comprobar })
+$BtnIdioma.Add_Click({ Menu-Idiomas })
 $Win.Add_ContentRendered({ Estado-Actual })
 $BtnEng.Add_Click({
     $r = [Windows.MessageBox]::Show('Se restaurarán los ficheros originales en inglés de los teatros marcados. ¿Continuar?', 'Restaurar inglés', 'YesNo', 'Question')
@@ -843,7 +999,12 @@ $BtnEditor.Add_Click({
 })
 $Win.Add_Activated({
     # al volver del editor, Archivos.csv puede haber cambiado
-    if ($script:VolverEstado -and $BtnEsp.IsEnabled) { $script:VolverEstado = $false; Estado-Actual }
+    # (y el editor puede haber creado un idioma o cambiado el de trabajo)
+    if ($script:VolverEstado -and $BtnEsp.IsEnabled) {
+        $script:VolverEstado = $false
+        Cargar-Idiomas; Poner-Idioma (Idioma-Actual $Aqui $script:Idiomas)
+        Estado-Actual
+    }
 })
 $BtnJugar.Add_Click({
     $exe = Join-Path $script:BMS 'Launcher\FalconBMS_Alternative_Launcher.exe'
@@ -858,7 +1019,14 @@ if (-not $script:BMS) {
     $script:BMS = Elegir-Ruta
     if (-not $script:BMS) { return }
 }
+Cargar-Idiomas
+Poner-Idioma (Idioma-Actual $Aqui $script:Idiomas)
 Detectar
-if (-not (Test-Path $Csv)) { Escribir 'No se encuentra Archivos.csv junto al instalador.' 'Rojo' }
+if ($script:Idiomas.Count -eq 0) {
+    Escribir 'Todavía no hay ningún idioma de la traducción (carpeta Idiomas).' 'Acento'
+    Escribir $(if ($Editor) { 'Para empezar uno: Abrir editor → Traducción → ＋ Nuevo idioma… (parte de los originales en inglés).' } else { 'Para empezar uno, usa el Editor BMS (Traducción → ＋ Nuevo idioma…).' }) 'Tenue'
+    Escribir 'Si ya tienes una traducción, copia su carpeta en Idiomas\<CÓDIGO> (con Archivos.csv y Ficheros).' 'Tenue'
+}
+elseif (-not (Test-Path -LiteralPath $Csv)) { Escribir ('No se encuentra ' + $Csv) 'Rojo' }
 [void]$Win.ShowDialog()
 Borrar-Temporal

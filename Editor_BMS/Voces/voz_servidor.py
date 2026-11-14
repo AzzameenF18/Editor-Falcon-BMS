@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 Servidor local de pruebas de voz para la pestana "Ajuste de voces" del Editor BMS.
-Carga XTTS-v2 una sola vez y sintetiza frases de prueba al momento.
+Carga el modelo (Chatterbox o XTTS-v2, motores.py) una sola vez y sintetiza frases de prueba al momento.
 Solo escucha en 127.0.0.1 y exige el token que le pasa el editor. Se cierra solo tras 20 min sin uso.
 
-  python voz_servidor.py --puerto 8899 --token XXXX
+  python voz_servidor.py --puerto 8899 --token XXXX [--motor chatterbox|xtts] [--variante v3|es-es]
 """
 import argparse, io, json, os, sys, threading, time, wave, traceback
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -13,6 +13,7 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 import numpy as np
 import generar_voces as G
+import motores as M
 
 ESTADO = {'listo': False, 'error': '', 'dispositivo': '', 'fase': 'arrancando'}
 MODELO = {}
@@ -22,50 +23,47 @@ ULTIMO = [time.time()]
 
 def cargar():
     try:
-        ESTADO['fase'] = 'cargando XTTS-v2'
+        ESTADO['fase'] = 'cargando ' + ('XTTS-v2' if ARGS.motor == 'xtts' else 'Chatterbox')
         import torch
-        from TTS.api import TTS
-        dev = 'cuda' if torch.cuda.is_available() else 'cpu'
-        tts = TTS('tts_models/multilingual/multi-dataset/xtts_v2').to(dev)
-        MODELO['m'] = tts.synthesizer.tts_model; MODELO['torch'] = torch
-        ESTADO['dispositivo'] = torch.cuda.get_device_name(0) if dev == 'cuda' else 'CPU'
+        MODELO['m'] = M.cargar(ARGS.motor, ARGS.variante, aviso=lambda t: print(t, flush=True))
+        ESTADO['dispositivo'] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'
+        ESTADO['motor'] = ARGS.motor + (' ' + ARGS.variante if ARGS.motor == 'chatterbox' else '')
         ESTADO['listo'] = True; ESTADO['fase'] = 'listo'
-        print('Listo en', ESTADO['dispositivo'], flush=True)
-    except Exception as e:
+        print('Listo en', ESTADO['dispositivo'], '-', ESTADO['motor'], flush=True)
+    except BaseException as e:
         ESTADO['error'] = str(e); ESTADO['fase'] = 'error'
         traceback.print_exc()
 
-def latentes(v):
-    torch = MODELO['torch']; m = MODELO['m']
-    f = os.path.join(AQUI, 'ref', f'voz{v:02d}.latentes.pt'); wr = os.path.join(AQUI, 'ref', f'voz{v:02d}.wav')
-    marca = os.path.getmtime(wr)
-    if v in LAT and LAT[v][0] == marca: return LAT[v][1]
-    if os.path.exists(f) and os.path.getmtime(f) >= marca:
-        LAT[v] = (marca, torch.load(f))
-    else:
-        print(f'Estandarizando voz {v:02d}...', flush=True)
-        g, s = m.get_conditioning_latents(audio_path=[wr], gpt_cond_len=30, max_ref_length=60)
-        torch.save((g, s), f); LAT[v] = (marca, (g, s))
-    return LAT[v][1]
+REF = os.path.join(AQUI, 'ref')
 
 def a_wav(pcm, sr):
     b = io.BytesIO(); w = wave.open(b, 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
     w.writeframes(np.asarray(pcm, dtype='<i2').tobytes()); w.close(); return b.getvalue()
 
+LECS = {}
+def lectura_de(ruta, idv):
+    """lectura (numeros, letras...) del idioma.json del idioma; recargada si cambia"""
+    if not ruta or not os.path.exists(ruta): return G.LEC.Lectura(None, idv)
+    m = os.path.getmtime(ruta)
+    if (ruta, idv) not in LECS or LECS[(ruta, idv)][0] != m: LECS[(ruta, idv)] = (m, G.LEC.cargar(ruta, idv))
+    return LECS[(ruta, idv)][1]
+
 def sintetizar(p):
-    v = int(p.get('voz', 0)); texto = str(p.get('texto', '')).strip() or 'Esto es una prueba de audio.'
-    temp = float(p.get('temperatura', 0.65)); vel = float(p.get('velocidad', 1.0))
+    idv = str(p.get('idioma') or G.LEC.idioma_voz(str(p.get('lectura') or ''), 'es'))
+    lec = lectura_de(str(p.get('lectura') or ''), idv)
+    dic = str(p.get('dic') or '')
+    v = int(p.get('voz', 0)); texto = str(p.get('texto', '')).strip() or (lec.cfg['frasePrueba'] + ' ' + str(v))
+    pv = M.params(ARGS.motor, float(p.get('temperatura', 0.65)), float(p.get('velocidad', 1.0)),
+                  float(p.get('cbTemperatura', 0.8)), float(p.get('expresividad', 0.5)), float(p.get('cfg', 0.5)))
     rms = float(p.get('rms', 6000)); radio = int(p.get('radio', 1))
     suav = float(p.get('suavizado', 0)); limp = float(p.get('limpieza', 0))
-    txt = G.normalizar(texto, G.cargar_diccionario(os.path.join(AQUI, 'pronunciaciones.txt')))
+    txt = lec.normalizar(texto, G.cargar_diccionario(dic))
     frase = txt[0].upper() + txt[1:]
     if frase[-1] not in '.?!': frase += '.'
-    g, s = latentes(v)
-    out = MODELO['m'].inference(frase, 'es', g, s, temperature=temp, speed=vel, enable_text_splitting=True)
-    x = np.asarray(out['wav'], dtype=np.float64)
+    x = MODELO['m'].decir(v, frase, idv, REF, partir=True, **pv)
     if p.get('sin_filtro'): return a_wav(G.crudo_a_pcm(x), 24000)
-    pre = int(p.get('pausaInicio', 50)); post = int(p.get('pausaFin', 100))
-    return a_wav(G.filtro_radio(x, 24000, rms, radio, pre, post, semilla=v, suavizado=suav, limpieza=limp), 8000)
+    pre = int(p.get('pausaInicio', 25)); post = int(p.get('pausaFin', 15))
+    return a_wav(G.filtro_radio(x, 24000, rms, radio, pre, post, semilla=v, suavizado=suav, limpieza=limp, esperado=G.esperado_de(txt, M.ritmo(ARGS.motor, pv))), 8000)
 
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
@@ -117,6 +115,8 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--puerto', type=int, default=8899)
     ap.add_argument('--token', required=True)
+    ap.add_argument('--motor', default='chatterbox', choices=list(M.MOTORES))
+    ap.add_argument('--variante', default='v3', choices=['v3', 'es-es'])
     ARGS = ap.parse_args()
     srv = ThreadingHTTPServer(('127.0.0.1', ARGS.puerto), H)
     print(f'Servidor de pruebas de voz en 127.0.0.1:{ARGS.puerto} (se cierra solo tras 20 min sin uso)', flush=True)

@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<script src="/i18n.js"></script>
 <title>Editor de campañas · Falcon BMS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -81,16 +82,16 @@ aside h3{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--dim);text-tra
     <button data-t="run" title="Textos en pantalla de los entrenamientos (.run)">Entrenamiento<b id="nRun"></b></button>
   </div>
   <div class="sep"></div>
-  <input id="q" type="search" placeholder="Buscar en inglés o español…">
+  <input id="q" type="search" placeholder="Buscar en inglés o en la traducción…">
   <div class="seg" id="filtros">
     <button data-f="todos" class="on">Todos<b id="cTodos"></b></button>
-    <button data-f="igual" title="El español es igual que el inglés">Sin traducir<b id="cIgual"></b></button>
+    <button data-f="igual" title="La traducción es igual que el inglés">Sin traducir<b id="cIgual"></b></button>
     <button data-f="var" title="El mismo nombre inglés tiene traducciones distintas en distintos ficheros">Variantes<b id="cVar"></b></button>
     <button data-f="mod" title="Cambiados y sin guardar">Cambiados<b id="cMod"></b></button>
   </div>
   <div class="grow"></div>
-  <button id="bExp" class="sm" title="Exporta Inglés→Español a un .txt (separado por tabulador)">Exportar</button>
-  <button id="bImp" class="sm" title="Importa un .txt Inglés[TAB]Español">Importar</button>
+  <button id="bExp" class="sm" title="Exporta Inglés→Traducción a un .txt (separado por tabulador)">Exportar</button>
+  <button id="bImp" class="sm" title="Importa un .txt Inglés[TAB]Traducción">Importar</button>
   <input type="file" id="fImp" accept=".txt,.tsv,.csv" hidden>
   <button id="bDes" disabled>Deshacer todo</button>
   <button id="bSave" class="pri" disabled>Guardar</button>
@@ -100,7 +101,7 @@ aside h3{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--dim);text-tra
     <div id="tblWrap">
       <table>
         <colgroup><col style="width:38%"><col><col style="width:64px"><col style="width:150px"><col style="width:40px"></colgroup>
-        <thead><tr><th>Inglés (original)</th><th>Español</th><th style="text-align:right">Veces</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Inglés (original)</th><th>Traducción</th><th style="text-align:right">Veces</th><th>Estado</th><th></th></tr></thead>
         <tbody id="tb"></tbody>
       </table>
     </div>
@@ -368,11 +369,11 @@ const TIPOS = {
   run:    { tab: 'run',   max: 250, vacio: false, nombre: 'Texto en pantalla' },
 };
 const AYUDA = {
-  obj: 'Cada fila es un <b>nombre de objetivo</b>. Al cambiarlo se cambia en <b>todos los ficheros</b> del teatro donde aparece ese nombre inglés. Máximo <b>79 caracteres</b>.',
+  obj: 'Cada fila es un <b>nombre de objetivo</b>. Al cambiarlo se cambia en <b>todos los ficheros</b> del teatro donde aparece ese nombre inglés: los .cam/.tac y su <b>CampObjData.XML</b>. Máximo <b>79 caracteres</b>. «N variantes» = el mismo nombre está traducido distinto en algún fichero.',
   bando: 'Nombres de los bandos (máx. <b>19</b>) y su <b>descripción</b> (máx. <b>199</b>). En los TE y entrenamientos, la descripción es el texto que sale al elegir la misión.<br>Las descripciones de entrenamiento van <b>rellenas con espacios</b> para partir las líneas del recuadro (unas 31 columnas por línea): respeta ese relleno.',
   run: 'Textos que aparecen en pantalla al empezar los <b>entrenamientos</b> (líneas <code>Print</code> de los .run). Sin comillas dobles. Comprueba en el juego que la fuente muestra bien las tildes.',
 };
-const COMUN = '<br><b>Intro</b> pasa a la fila siguiente · <b>Esc</b> deshace la fila · clic en el inglés lo copia al español. Solo caracteres ANSI (Windows-1252).';
+const COMUN = '<br><b>Intro</b> pasa a la fila siguiente · <b>Esc</b> deshace la fila · clic en el inglés lo copia a la traducción. Solo caracteres ANSI (Windows-1252).';
 
 let INFO = null, TEATRO = null, FILES = [], GROUPS = [], VIEW = [], PAGE = 0, FILTRO = 'todos', TAB = 'obj';
 const PER = 200;
@@ -386,7 +387,7 @@ async function init(){
     return;
   }
   const sel = $('#teatro'); const teatros = [...new Set(INFO.filas.map(f => f.teatro))];
-  if (!teatros.length){ log('No hay ficheros .cam/.tac/.trn/.run de Campaign en ' + (INFO.csv || 'Archivos.csv')); return; }
+  if (!teatros.length){ log('No hay ficheros .cam/.tac/.trn/.run ni CampObjData.XML en ' + (INFO.csv || 'Archivos.csv')); return; }
   sel.innerHTML = teatros.map(t => `<option>${esc(t)}</option>`).join('');
   sel.onchange = () => cargarTeatro(sel.value);
   log('Instalador: ' + (INFO.csv || '—'));
@@ -416,42 +417,63 @@ function itemsBinario(f){
   return items;
 }
 const RUN_RE = /((?:Wait)?Print\s+-?\d+\s+")([^"\r\n]*)(")/g;
+// CampObjData.XML: <CampObj CampId="n"> <CampName>nombre</CampName> (los mismos objetivos que los .cam/.tac)
+const XML_RE = /(<CampObj\s+CampId="(\d+)"[^>]*>\s*<CampName>)([^<]*)(<\/CampName>)/g;
+const desXml = s => s.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi, (m, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" })[e.toLowerCase()] ??
+  String.fromCharCode(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)));
+const aXml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// algunos XML originales traen nombres en UTF-8 leídos como Latin-1 (Ã¦ = æ): se arreglan para emparejar
+const desMojibake = s => { if (!/[ÃÂÅÄÐÑ]/.test(s)) return s; const b = CampCore.enc(s); if (!b) return s; try { return new TextDecoder('utf-8', { fatal: true }).decode(b); } catch (e) { return s; } };
+function itemsXml(texto){
+  const items = []; let m; XML_RE.lastIndex = 0;
+  while ((m = XML_RE.exec(texto))) items.push({ tipo: 'obj', es: desXml(m[3]), ref: { xq: items.length, id: m[2] } });
+  return items;
+}
+function nuevoXml(texto, cambios){
+  let q = 0; XML_RE.lastIndex = 0;
+  return texto.replace(XML_RE, (m, a, id, t, c) => { const k = q++; return cambios.has(k) ? a + aXml(cambios.get(k)) + c : m; });
+}
 function itemsRun(texto){
   const items = []; let m; RUN_RE.lastIndex = 0;
   while ((m = RUN_RE.exec(texto))) items.push({ tipo: 'run', es: m[2], ref: { q: items.length } });
   return items;
 }
 // clave para emparejar un texto con el del original
-const clave = it => it.tipo === 'obj' ? 'o' + it.ref.off : it.ref.cmp != null ? 'c' + it.ref.k + it.ref.campo : it.ref.te != null ? 't' + it.ref.q : 'r' + it.ref.q;
+const clave = it => it.ref.id != null ? 'x' + it.ref.id : it.tipo === 'obj' ? 'o' + it.ref.off : it.ref.cmp != null ? 'c' + it.ref.k + it.ref.campo : it.ref.te != null ? 't' + it.ref.q : 'r' + it.ref.q;
 
 async function cargarTeatro(t){
   if (pendientes() && !confirm('Hay cambios sin guardar. ¿Descartarlos y cambiar de teatro?')){ $('#teatro').value = TEATRO; return; }
   TEATRO = t; FILES = []; GROUPS = [];
   const filas = INFO.filas.filter(f => f.teatro === t);
   for (const [k, fila] of filas.entries()){
-    veil(`Leyendo ${fila.fich}  (${k+1}/${filas.length})…`); await tick();
-    const it = { fila, nombre: fila.fich.split('\\').pop(), err: null, refSrc: '', run: /\.run$/i.test(fila.fich) };
+    const nom = fila.fich || fila.data;   // sin fich: fichero de un teatro nuevo que aún no está en el instalador
+    veil(`Leyendo ${nom}  (${k+1}/${filas.length})…`); await tick();
+    const it = { fila, nombre: nom.split('\\').pop(), err: null, refSrc: '', run: /\.run$/i.test(nom), xml: /\.xml$/i.test(nom), nuevo: !fila.fich };
     FILES.push(it);
     try {
-      const b = await bajar(fila.i, 'fich');
+      let b = await bajar(fila.i, 'fich');
+      if (!b && it.nuevo) for (const src of ['orig', 'game']){ b = await bajar(fila.i, src); if (b){ it.refSrc = src === 'orig' ? 'Data_ORIGINAL' : 'juego'; break; } }
       if (!b){ it.err = 'no está en Ficheros'; continue; }
       it.bytes = b;
       if (it.run){ it.texto = CampCore.dec(b, 0, b.length); it.items = itemsRun(it.texto); }
+      else if (it.xml){ it.texto = CampCore.dec(b, 0, b.length); it.items = itemsXml(it.texto); }
       else { it.f = CampCore.load(b); it.items = itemsBinario(it.f); }
       if (!it.items.length){ it.err = 'sin textos'; continue; }
+      // teatro nuevo: se parte del inglés (aún sin traducir)
+      if (it.nuevo){ it.en = it.items.map(x => it.xml ? desMojibake(x.es) : x.es); it.refNota = 'aún no está en el instalador: se añade al guardar'; continue; }
       // original en inglés: Data_ORIGINAL; si no, el del juego (si no es ya la traducción)
       for (const src of ['orig', 'game']){
         const rb = await bajar(fila.i, src); if (!rb) continue;
         if (iguales(rb, b)){ if (src === 'game') it.refNota = 'el del juego es igual que el traducido'; continue; }
         let ri;
-        try { ri = it.run ? itemsRun(CampCore.dec(rb, 0, rb.length)) : (() => { const rf = CampCore.load(rb); if (it.f.obj && (!rf.obj || rf.obj.ulen !== it.f.obj.ulen)) return null; return itemsBinario(rf); })(); }
+        try { ri = it.run ? itemsRun(CampCore.dec(rb, 0, rb.length)) : it.xml ? itemsXml(CampCore.dec(rb, 0, rb.length)).map(x => (x.es = desMojibake(x.es), x)) : (() => { const rf = CampCore.load(rb); if (it.f.obj && (!rf.obj || rf.obj.ulen !== it.f.obj.ulen)) return null; return itemsBinario(rf); })(); }
         catch (e) { continue; }
         if (!ri) continue;
         const mapa = new Map(ri.map(x => [clave(x), x.es]));
         const en = it.items.map(x => mapa.has(clave(x)) ? mapa.get(clave(x)) : null);
         const okN = en.filter(x => x != null).length;
         if (okN < it.items.length * 0.9) continue;
-        if (src === 'game' && it.f && it.f.obj){
+        if (src === 'game' && ((it.f && it.f.obj) || it.xml)){
           const objs = it.items.map((x, j) => x.tipo === 'obj' && en[j] !== x.es).filter(Boolean).length;
           if (objs < it.items.filter(x => x.tipo === 'obj').length * 0.10){ it.refNota = 'el del juego ya está traducido'; continue; }
         }
@@ -505,10 +527,10 @@ function pintarFicheros(){
     let r;
     if (it.err) r = `<span class="e">${esc(it.err)}</span>`;
     else r = `<span>${cuenta(it)} · ${it.refSrc ? 'inglés: ' + it.refSrc : '<span class="w">sin inglés</span>'}</span>`;
-    return `<div title="${esc(it.fila.fich + (it.refNota ? '\n' + it.refNota : ''))}"><span>${esc(it.nombre)}</span>${r}</div>`;
+    return `<div title="${esc((it.fila.fich || it.fila.data) + (it.refNota ? '\n' + it.refNota : ''))}"><span>${esc(it.nombre)}</span>${r}</div>`;
   }).join('');
   if (FILES.some(it => it.items && !it.en))
-    log('Algún fichero no tiene original en inglés (Data_ORIGINAL o juego sin traducir): sus textos se agrupan por el español.');
+    log('Algún fichero no tiene original en inglés (Data_ORIGINAL o juego sin traducir): sus textos se agrupan por la traducción.');
 }
 
 function filtrar(){
@@ -540,7 +562,7 @@ function fila(g, idx){
   if (igual && !s.mod && g.en.trim()) st += '<span class="tag same">= inglés</span>';
   const en = g.en == null ? '<span class="dim">—</span>' : esc(g.en).replace(/ {2,}/g, m => '<span class="dim">' + '·'.repeat(m.length) + '</span>');
   return `<tr data-i="${idx}" class="${s.mod ? 'mod' : ''} ${s.bad ? 'badv' : ''}">
-    <td class="en" title="${g.en == null ? '' : esc(g.en) + '\n(clic: copiar al español)'}">${en}</td>
+    <td class="en" title="${g.en == null ? '' : esc(g.en) + '\n(clic: copiar a la traducción)'}">${en}</td>
     <td class="es"><input type="text" value="${esc(g.val)}" spellcheck="false"></td>
     <td class="n" title="${g.files.size} fichero(s):\n${esc([...g.files].map(fi => FILES[fi].nombre).join('\n'))}">${g.occ.length}</td>
     <td class="st">${st}</td>
@@ -637,6 +659,11 @@ $('#bSave').onclick = async () => {
         const m = new Map(cambios.map(c => [it.items[c.j].ref.q, c.text]));
         const t = nuevoRun(it.texto, m); bytes = CampCore.enc(t);
         if (!bytes) throw new Error('carácter no válido');
+      } else if (it.xml){
+        const m = new Map(cambios.map(c => [it.items[c.j].ref.xq, c.text]));
+        const t = nuevoXml(it.texto, m); bytes = CampCore.enc(t);
+        if (!bytes) throw new Error('carácter no válido');
+        if (itemsXml(t).length !== it.items.length) throw new Error('el XML ha quedado mal (verificación)');
       } else {
         const obj = [], cmp = [], te = [];
         for (const c of cambios){
@@ -650,12 +677,14 @@ $('#bSave').onclick = async () => {
       const resp = await api(`/api/put?i=${it.fila.i}`, { method: 'POST', body: bytes });
       const js = await resp.json();
       if (!js.ok) throw new Error(js.error || 'el servidor no lo guardó');
+      if (js.fich){ it.fila.fich = js.fich; it.nuevo = false; }
       // se vuelve a leer lo guardado
       it.bytes = bytes;
       if (it.run){ it.texto = CampCore.dec(bytes, 0, bytes.length); it.items = itemsRun(it.texto); }
+      else if (it.xml){ it.texto = CampCore.dec(bytes, 0, bytes.length); it.items = itemsXml(it.texto); }
       else { it.f = CampCore.load(bytes); it.items = itemsBinario(it.f); }
-      ok++; log(`Guardado ${it.fila.fich}: ${cambios.length} texto(s)` + (js.respaldo ? `  (copia previa en ${js.respaldo})` : ''));
-    } catch (e) { fallos++; log(`ERROR en ${it.fila.fich}: ${e.message}`); }
+      ok++; log(`Guardado ${it.fila.fich || it.fila.data}: ${cambios.length} texto(s)` + (js.respaldo ? `  (copia previa en ${js.respaldo})` : ''));
+    } catch (e) { fallos++; log(`ERROR en ${it.fila.fich || it.fila.data}: ${e.message}`); }
   }
   veil('');
   agrupar(); filtrar();
